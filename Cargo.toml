@@ -1,0 +1,7 @@
+[package]
+name = "wake_lib"
+version = "0.1.0"
+authors = ["Vladimir K <ew1abz@gmail.com>"]
+
+[dependencies]
+serialport = "1.0.1"
