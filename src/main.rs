@@ -147,6 +147,9 @@ pub fn do_destuffing(data: &mut Vec<u8>) -> bool {
 /// * `crc` - A preinitialized crc
 /// * `data` - Input data
 pub fn do_destuffing_o(data: &Vec<u8>) -> Option<Vec<u8>> {
+    if data.len() < PACKET_MIN_LEN || data.len() < PACKET_MIN_LEN || data[0] != FESC {
+         return None
+    }
     let mut output = vec![data[0]];
     let mut i = 1; // skip the first element
     while i < data.len() {
@@ -261,7 +264,12 @@ mod tests {
         let t3 = vec![super::FESC, super::FESC, super::TFESC, 1, 2, 3, 4, 5, super::FESC];                // stuffed_data without last byte
         let t4 = vec![super::FESC, super::FESC,               1, 2, 3, 4, 5, super::FESC, super::TFEND];  // stuffed_data with missed 3rd byte
         let t5 = vec![super::FESC, super::FESC, super::TFESC, 1, 2, 3, 4, 5, super::FESC, super::TFEND];  // good stuffed_data 
-        assert!(super::do_destuffing_o(&t1 == None));
+        let a5 = vec![super::FESC, super::FESC,               1, 2, 3, 4, 5, super::FEND];                // destuffed t5
+        assert_eq!(super::do_destuffing_o(&t1), None);
+        assert_eq!(super::do_destuffing_o(&t2), None);
+        assert_eq!(super::do_destuffing_o(&t3), None);
+        assert_eq!(super::do_destuffing_o(&t4), None);
+        assert_eq!(super::do_destuffing_o(&t5), Some(a5));
     }
 
     #[test]
