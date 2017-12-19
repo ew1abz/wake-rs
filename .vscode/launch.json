@@ -8,7 +8,7 @@
             "name": "(Windows) Launch",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/target/debug/wake_lib.exe",
+            "program": "${workspaceFolder}/target/debug/wake.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

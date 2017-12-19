@@ -87,7 +87,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wake_lib"
+name = "wake"
 version = "0.1.0"
 dependencies = [
  "serialport 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
