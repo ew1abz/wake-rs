@@ -18,6 +18,7 @@ pub struct WakePacket {
     pub cmd : u8,
     pub n   : u8,
     pub data: Vec<u8>,
+    pub crc : u8,
 }
 
 /// Update CRC sum
@@ -36,23 +37,15 @@ pub struct WakePacket {
 pub fn do_crc8(crc: &mut u8, data: u8)
 {
     let mut b = data;
-    for _i in 0..8 {
+    for _ in 0..8 {
         *crc = if (b ^ *crc) & 1 == 1 { ((*crc ^ 0x18) >> 1) | 0x80 } else { (*crc >> 1) & !0x80 };
         b = b >> 1;
     }
 }
 
-pub fn do_crc_array(arr: &[u8]) -> u8 {
+pub fn do_crc_vec(data: &Vec<u8>) -> u8 {
     let mut crc: u8 = CRC_INIT;
-    for n in arr.iter() {
-        do_crc8(&mut crc, *n);
-    }
-    crc
-}
-
-pub fn do_crc_vec(arr: &Vec<u8>) -> u8 {
-    let mut crc: u8 = CRC_INIT;
-    for n in arr.iter() {
+    for n in data {
         do_crc8(&mut crc, *n);
     }
     crc
@@ -124,7 +117,7 @@ pub fn encode_packet(cmd: u8, data: &[u8]) -> Vec<u8>
 {
     let mut encoded_packet = vec![FEND, cmd, data.len() as u8];
     encoded_packet.extend(data.iter().cloned());
-    let crc = do_crc_array(&encoded_packet);
+    let crc = do_crc_vec(&encoded_packet);
     encoded_packet.push(crc);
     stuffing(&encoded_packet)
 }
@@ -142,14 +135,17 @@ pub fn decode_packet(recieved_pkt: &Vec<u8>) -> Result<WakePacket, &str> {
     }
     let destuffed_pkt = destuffed_pkt.unwrap();        
     let received_crc = *destuffed_pkt.last().unwrap();
-    let destuffed_pkt_wo_crc = &destuffed_pkt[..destuffed_pkt.len() - 2]; // remove crc from packet       
-    if (destuffed_pkt_wo_crc.len() - 2) != destuffed_pkt[2] as usize {
+    let destuffed_pkt_wo_crc = &destuffed_pkt[..destuffed_pkt.len() - 1]; // remove crc from packet       
+    if (destuffed_pkt_wo_crc.len() - 3) != destuffed_pkt[2] as usize {
         return Err(WRONG_LEN)                   
     }
-    if received_crc != do_crc_array(destuffed_pkt_wo_crc) {
-        return Err(WRONG_CRC)           
+    if received_crc != do_crc_vec(&destuffed_pkt_wo_crc.to_vec()) {
+        return Err(WRONG_CRC);           
     }
-    Ok(WakePacket { cmd: destuffed_pkt[1], n: destuffed_pkt[2], data: destuffed_pkt_wo_crc.to_vec() })
+    Ok(WakePacket { cmd: destuffed_pkt[1],
+                    n: destuffed_pkt[2], 
+                    data: destuffed_pkt_wo_crc[3..].to_vec(), 
+                    crc: received_crc})
 }
 
 #[cfg(test)]
@@ -169,11 +165,11 @@ mod tests {
     }
 
     #[test]
-    fn crc_array_test() {
-        let xs: [u8; 5] = [1, 2, 3, 4, 5];
-        assert!(super::do_crc_array(&xs) == 0xd6);
-        let xs: [u8; 3] = [0xc0, 0x03, 0x00];
-        assert!(super::do_crc_array(&xs) == 0xeb);
+    fn crc_vec_test() {
+        let xs = vec![1, 2, 3, 4, 5];
+        assert!(super::do_crc_vec(&xs) == 0xd6);
+        let xs = vec![0xc0, 0x03, 0x00];
+        assert!(super::do_crc_vec(&xs) == 0xeb);
     }
 
     #[test]
@@ -218,7 +214,7 @@ mod tests {
         good_packet.extend_from_slice(&crc);
         match super::decode_packet(&good_packet) {
             Ok(w) => { assert_eq!(w.cmd, cmd); assert_eq!(w.n, n); assert_eq!(w.data, data); },
-            Err(err) => println!("Error: {:?}", err),
+            Err(err) => panic!("Error: {:?}", err),
         }
 
         let bad_packet_too_short = vec![super::FEND, cmd, n];

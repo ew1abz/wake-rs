@@ -14,30 +14,26 @@ fn print_packet(header: &str, v: &Vec<u8>) {
 
 /// Main function doc string
 fn main() {
-    let xs: [u8; 5] = [1, 2, 3, 4, 5];
-    let crc = wake::do_crc_array(&xs);
+    let xs = vec![1, 2, 3, 4, 5];
+    let crc = wake::do_crc_vec(&xs);
     println!("CRC: 0x{:X}", crc);
 
     let v = vec![FEND, FESC, 1, 2, 3, 4, 5, FEND];
-    print_packet("Initial packet", &v);
+    print_packet("Initial packet\t", &v);
 
     let stuffed = stuffing(&v);
-    print_packet("Stuffed packet", &stuffed);
+    print_packet("Stuffed packet\t", &stuffed);
 
     let destuffed = destuffing(&stuffed);
     print_packet("Destuffed packet", &destuffed.unwrap());
     
     let encoded = encode_packet(0x03, &xs);
-    print_packet("Encoded packet", &encoded);
+    print_packet("Encoded packet\t", &encoded);
    
     let decoded = decode_packet(&encoded);
     match decoded {
-        Ok(w) => print!("Decoded packet\tcmd: 0x{:X}\tn: 0x{:X}", w.cmd, w.n),
+        Ok(w) => { print!("\nDecoded packet\t:\tcmd = 0x{:02X}  n = 0x{:02X}  crc = 0x{:02X}", w.cmd, w.n, w.crc);
+                   print_packet("        data\t", &w.data); },
         Err(err) => println!("Error: {:?}", err),
     }
-    //let d = decoded.as_ref().map(|s| s.clone());
-    //let d1 = d.clone();
-    
-//      Ok(w) => print!("Decoded packet\tcmd: 0x{:X}\tn: 0x{:X}", w.as_ref().unwrap().cmd, w.as_ref().unwrap().n),
-    //print_packet("Decoded packet data\t", &decoded.unwrap().data);
 }
