@@ -1,11 +1,11 @@
 #![crate_name = "wake"]
 //! Wake protocol library
 
-const CRC_INIT: u8 = 0xDE;
 const FEND: u8     = 0xC0;
 const FESC: u8     = 0xDB;
 const TFEND: u8    = 0xDC;
 const TFESC: u8    = 0xDD;
+const CRC_INIT: u8 = 0xDE;
 const PACKET_MIN_LEN: usize = 4;
 
 const TOO_SHORT_PACKET:  &'static str = "Too short packet";
@@ -13,13 +13,6 @@ const CANNOT_FIND_START: &'static str = "Cannot find start of packet";
 const DESTUFFING_FAILED: &'static str = "Destuffing failed";
 const WRONG_LEN:         &'static str = "Wrong packet lenght";
 const WRONG_CRC:         &'static str = "Wrong CRC";
-
-pub struct WakePacket {
-    pub cmd : u8,
-    pub n   : u8,
-    pub data: Vec<u8>,
-    pub crc : u8,
-}
 
 /// Update CRC sum
 ///
@@ -32,9 +25,9 @@ pub struct WakePacket {
 ///
 /// ```
 /// let mut crc: u8 = 0xDE;
-/// wake::do_crc8(&mut crc, 0x31);
+/// wake::crc8(&mut crc, 0x31);
 /// ```
-pub fn do_crc8(crc: &mut u8, data: u8)
+pub fn crc8(crc: &mut u8, data: u8)
 {
     let mut b = data;
     for _ in 0..8 {
@@ -43,19 +36,40 @@ pub fn do_crc8(crc: &mut u8, data: u8)
     }
 }
 
-pub fn do_crc_vec(data: &Vec<u8>) -> u8 {
+/// Calculate CRC sum of data in a vector
+///
+/// # Arguments
+///
+/// * `data: &Vec<u8>` - Vector with data
+///
+/// # Output
+/// 
+/// * `u8` - Calculated CRC
+/// 
+/// # Example
+///
+/// ```
+/// let data = vec![1, 2, 3, 4, 5];
+/// assert!(wake::crc_vec(&data) == 0xd6);
+/// ```
+pub fn crc_vec(data: &Vec<u8>) -> u8 {
     let mut crc: u8 = CRC_INIT;
     for n in data {
-        do_crc8(&mut crc, *n);
+        crc8(&mut crc, *n);
     }
     crc
 }
 
-/// Does byte stuffing in Vec
+/// Does byte stuffing in a vector
 ///
 /// # Arguments
 ///
 /// * `data: &Vec<u8>` - input data
+/// 
+/// # Output
+/// 
+/// * `Vec<u8>` - output data
+/// 
 pub fn stuffing(data: &Vec<u8>) -> Vec<u8> {
     let mut stuffed = vec![data[0]];
     for x in &data[1..] {
@@ -68,12 +82,16 @@ pub fn stuffing(data: &Vec<u8>) -> Vec<u8> {
     stuffed
 }
 
-/// Does byte destuffing in Vec
+/// Does byte destuffing in a vector
 ///
 /// # Arguments
 ///
 /// * `data` - Input data
+/// 
+/// # Output
+/// 
 /// * `Option<Vec<u8>>` - Output data wraped in Option
+/// 
 pub fn destuffing(data: &Vec<u8>) -> Option<Vec<u8>> {
     let mut output: Vec<u8> = vec![];
     let mut i = 0;
@@ -100,7 +118,7 @@ pub fn destuffing(data: &Vec<u8>) -> Option<Vec<u8>> {
 ///
 /// # Arguments
 ///
-/// * `cmd` - Command code
+/// * `command` - Command code
 /// * `data` - Data for transfer
 ///
 /// # Output
@@ -112,24 +130,53 @@ pub fn destuffing(data: &Vec<u8>) -> Option<Vec<u8>> {
 /// ```
 /// let mut wake_packet: Vec<u8> = wake::encode_packet(0x03, &[1, 2, 3, 4, 5]);
 /// ```
-/// TODO: Insert address
-pub fn encode_packet(cmd: u8, data: &[u8]) -> Vec<u8>
+/// *TODO*: Add address support
+/// 
+pub fn encode_packet(command: u8, data: &[u8]) -> Vec<u8>
 {
-    let mut encoded_packet = vec![FEND, cmd, data.len() as u8];
+    let mut encoded_packet = vec![FEND, command, data.len() as u8];
     encoded_packet.extend(data.iter().cloned());
-    let crc = do_crc_vec(&encoded_packet);
+    let crc = crc_vec(&encoded_packet);
     encoded_packet.push(crc);
     stuffing(&encoded_packet)
 }
 
-pub fn decode_packet(recieved_pkt: &Vec<u8>) -> Result<WakePacket, &str> {
-    if recieved_pkt.len() < PACKET_MIN_LEN {
+/// Decode packet from wake format to wake structure
+///
+/// # Arguments
+///
+/// * `received_pkt: &Vec<u8>` - Input data in wake format
+///
+/// # Output
+///
+/// * `Result<(u8, Vec<u8>), &str>` - command, data or error string
+///
+/// # Example
+///
+/// ```
+/// let encoded_packet = vec![0xC0, 0x03, 0x05, 1, 2, 3, 4, 5, 0x6b];
+/// let decoded_packet = wake::decode_packet(&encoded_packet);
+/// match decoded_packet {
+///     Ok(w) => { 
+///         print!("\nDecoded packet\t:\tcommand = 0x{:02X} ", w.0);
+///         print!("  data = ");
+///         for x in w.1 {
+///             print!("0x{:02X} ", x);
+///         }
+///     },
+///     Err(err) => println!("Error: {:?}", err),
+/// }
+/// ```
+/// *TODO*: Add address support
+/// 
+pub fn decode_packet(received_pkt: &Vec<u8>) -> Result<(u8, Vec<u8>), &str> {
+    if received_pkt.len() < PACKET_MIN_LEN {
          return Err(TOO_SHORT_PACKET)
     }
-    if recieved_pkt[0] != FEND {
+    if received_pkt[0] != FEND {
          return Err(CANNOT_FIND_START)
     }
-    let destuffed_pkt = destuffing(&recieved_pkt);
+    let destuffed_pkt = destuffing(&received_pkt);
     if destuffed_pkt == None {
          return Err(DESTUFFING_FAILED)
     }
@@ -139,13 +186,10 @@ pub fn decode_packet(recieved_pkt: &Vec<u8>) -> Result<WakePacket, &str> {
     if (destuffed_pkt_wo_crc.len() - 3) != destuffed_pkt[2] as usize {
         return Err(WRONG_LEN)                   
     }
-    if received_crc != do_crc_vec(&destuffed_pkt_wo_crc.to_vec()) {
+    if received_crc != crc_vec(&destuffed_pkt_wo_crc.to_vec()) {
         return Err(WRONG_CRC);           
     }
-    Ok(WakePacket { cmd: destuffed_pkt[1],
-                    n: destuffed_pkt[2], 
-                    data: destuffed_pkt_wo_crc[3..].to_vec(), 
-                    crc: received_crc})
+    Ok((destuffed_pkt[1], destuffed_pkt_wo_crc[3..].to_vec()))
 }
 
 #[cfg(test)]
@@ -154,22 +198,22 @@ mod tests {
     fn crc8_test() {
         const CRC_INIT: u8 = 0xDE;
         let mut crc: u8 = CRC_INIT;
-        super::do_crc8(&mut crc, 0x00);
+        super::crc8(&mut crc, 0x00);
         assert!(crc == 0x48);
-        super::do_crc8(&mut crc, 0x01);
+        super::crc8(&mut crc, 0x01);
         assert!(crc == 0xda);
-        super::do_crc8(&mut crc, 0xff);
+        super::crc8(&mut crc, 0xff);
         assert!(crc == 0x1c);
-        super::do_crc8(&mut crc, 0x55);
+        super::crc8(&mut crc, 0x55);
         assert!(crc == 0xda);
     }
 
     #[test]
     fn crc_vec_test() {
         let xs = vec![1, 2, 3, 4, 5];
-        assert!(super::do_crc_vec(&xs) == 0xd6);
+        assert!(super::crc_vec(&xs) == 0xd6);
         let xs = vec![0xc0, 0x03, 0x00];
-        assert!(super::do_crc_vec(&xs) == 0xeb);
+        assert!(super::crc_vec(&xs) == 0xeb);
     }
 
     #[test]
@@ -203,27 +247,27 @@ mod tests {
 
     #[test]
     fn decode_packet_test() {
-        let cmd = 0x03u8;
+        let command = 0x03u8;
         let data = [1, 2, 3, 4, 5];
         let n = data.len() as u8;
         let crc = [0x6B];
         let wrong_crc = [0x6C];
 
-        let mut good_packet = vec![super::FEND, cmd, n];
+        let mut good_packet = vec![super::FEND, command, n];
         good_packet.extend_from_slice(&data);
         good_packet.extend_from_slice(&crc);
         match super::decode_packet(&good_packet) {
-            Ok(w) => { assert_eq!(w.cmd, cmd); assert_eq!(w.n, n); assert_eq!(w.data, data); },
+            Ok(w) => { assert_eq!(w.0, command); assert_eq!(w.1, data); },
             Err(err) => panic!("Error: {:?}", err),
         }
 
-        let bad_packet_too_short = vec![super::FEND, cmd, n];
+        let bad_packet_too_short = vec![super::FEND, command, n];
         match super::decode_packet(&bad_packet_too_short) {
             Ok(_w) => panic!("It should be Error"),
             Err(err) => assert_eq!(err, super::TOO_SHORT_PACKET),
         }
 
-        let mut bad_packet_wo_start = vec![cmd, n];
+        let mut bad_packet_wo_start = vec![command, n];
         bad_packet_wo_start.extend_from_slice(&data);
         bad_packet_wo_start.extend_from_slice(&crc);
         match super::decode_packet(&bad_packet_wo_start) {
@@ -237,7 +281,7 @@ mod tests {
             Err(err) => assert_eq!(err, super::DESTUFFING_FAILED),
         }
 
-        let mut bad_packet_wrong_data_len = vec![super::FEND, cmd, n - 1];
+        let mut bad_packet_wrong_data_len = vec![super::FEND, command, n - 1];
         bad_packet_wrong_data_len.extend_from_slice(&data);
         bad_packet_wrong_data_len.extend_from_slice(&wrong_crc);
         match super::decode_packet(&bad_packet_wrong_data_len) {
@@ -245,7 +289,7 @@ mod tests {
             Err(err) => assert_eq!(err, super::WRONG_LEN),
         }
 
-        let mut bad_packet_wrong_data_len = vec![super::FEND, cmd, n + 1];
+        let mut bad_packet_wrong_data_len = vec![super::FEND, command, n + 1];
         bad_packet_wrong_data_len.extend_from_slice(&data);
         bad_packet_wrong_data_len.extend_from_slice(&wrong_crc);
         match super::decode_packet(&bad_packet_wrong_data_len) {
@@ -253,7 +297,7 @@ mod tests {
             Err(err) => assert_eq!(err, super::WRONG_LEN),
         }
 
-        let mut bad_packet_wrong_crc = vec![super::FEND, cmd, n];
+        let mut bad_packet_wrong_crc = vec![super::FEND, command, n];
         bad_packet_wrong_crc.extend_from_slice(&data);
         bad_packet_wrong_crc.extend_from_slice(&wrong_crc);
         match super::decode_packet(&bad_packet_wrong_crc) {

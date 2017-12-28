@@ -15,7 +15,7 @@ fn print_packet(header: &str, v: &Vec<u8>) {
 /// Main function doc string
 fn main() {
     let xs = vec![1, 2, 3, 4, 5];
-    let crc = wake::do_crc_vec(&xs);
+    let crc = wake::crc_vec(&xs);
     println!("CRC: 0x{:X}", crc);
 
     let v = vec![FEND, FESC, 1, 2, 3, 4, 5, FEND];
@@ -32,8 +32,8 @@ fn main() {
    
     let decoded = decode_packet(&encoded);
     match decoded {
-        Ok(w) => { print!("\nDecoded packet\t:\tcmd = 0x{:02X}  n = 0x{:02X}  crc = 0x{:02X}", w.cmd, w.n, w.crc);
-                   print_packet("        data\t", &w.data); },
+        Ok(w) => { print!("\nDecoded packet\t:\tcmd = 0x{:02X} ", w.0 );
+                   print_packet("        data\t", &w.1); },
         Err(err) => println!("Error: {:?}", err),
     }
 }
