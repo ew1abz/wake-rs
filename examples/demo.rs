@@ -26,10 +26,10 @@ fn main() {
 
     let destuffed = destuffing(&stuffed);
     print_packet("Destuffed packet:", &destuffed.unwrap());
-    
+
     let encoded = encode_packet(0x03, &xs);
     print_packet("Encoded packet:\t", &encoded);
-   
+
     let decoded = decode_packet(&encoded);
     match decoded {
         Ok(w) => { print!("\nDecoded packet:\t\tcmd  =  {:02X} ", w.0 );

@@ -43,9 +43,9 @@ pub fn crc8(crc: &mut u8, data: u8)
 /// * `data: &Vec<u8>` - Vector with data
 ///
 /// # Output
-/// 
+///
 /// * `u8` - Calculated CRC
-/// 
+///
 /// # Example
 ///
 /// ```
@@ -65,11 +65,11 @@ pub fn crc_vec(data: &Vec<u8>) -> u8 {
 /// # Arguments
 ///
 /// * `data: &Vec<u8>` - input data
-/// 
+///
 /// # Output
-/// 
+///
 /// * `Vec<u8>` - output data
-/// 
+///
 pub fn stuffing(data: &Vec<u8>) -> Vec<u8> {
     let mut stuffed = vec![data[0]];
     for x in &data[1..] {
@@ -87,11 +87,11 @@ pub fn stuffing(data: &Vec<u8>) -> Vec<u8> {
 /// # Arguments
 ///
 /// * `data` - Input data
-/// 
+///
 /// # Output
-/// 
+///
 /// * `Option<Vec<u8>>` - Output data wraped in Option
-/// 
+///
 pub fn destuffing(data: &Vec<u8>) -> Option<Vec<u8>> {
     let mut output: Vec<u8> = vec![];
     let mut i = 0;
@@ -105,9 +105,9 @@ pub fn destuffing(data: &Vec<u8>) -> Option<Vec<u8>> {
                     TFESC => { output.push(FESC); i += 1; },
                     TFEND => { output.push(FEND); i += 1; },
                     _     => return None,
-                }                
-            } 
-            _ => output.push(data[i]), 
+                }
+            }
+            _ => output.push(data[i]),
         }
         i += 1;
     }
@@ -131,7 +131,7 @@ pub fn destuffing(data: &Vec<u8>) -> Option<Vec<u8>> {
 /// let mut wake_packet: Vec<u8> = wake::encode_packet(0x03, &[1, 2, 3, 4, 5]);
 /// ```
 /// *TODO*: Add address support
-/// 
+///
 pub fn encode_packet(command: u8, data: &[u8]) -> Vec<u8>
 {
     let mut encoded_packet = vec![FEND, command, data.len() as u8];
@@ -157,7 +157,7 @@ pub fn encode_packet(command: u8, data: &[u8]) -> Vec<u8>
 /// let encoded_packet = vec![0xC0, 0x03, 0x05, 1, 2, 3, 4, 5, 0x6b];
 /// let decoded_packet = wake::decode_packet(&encoded_packet);
 /// match decoded_packet {
-///     Ok(w) => { 
+///     Ok(w) => {
 ///         print!("\nDecoded packet\t:\tcommand = 0x{:02X} ", w.0);
 ///         print!("  data = ");
 ///         for x in w.1 {
@@ -168,7 +168,7 @@ pub fn encode_packet(command: u8, data: &[u8]) -> Vec<u8>
 /// }
 /// ```
 /// *TODO*: Add address support
-/// 
+///
 pub fn decode_packet(received_pkt: &Vec<u8>) -> Result<(u8, Vec<u8>), &str> {
     if received_pkt.len() < PACKET_MIN_LEN {
          return Err(TOO_SHORT_PACKET)
@@ -180,14 +180,14 @@ pub fn decode_packet(received_pkt: &Vec<u8>) -> Result<(u8, Vec<u8>), &str> {
     if destuffed_pkt == None {
          return Err(DESTUFFING_FAILED)
     }
-    let destuffed_pkt = destuffed_pkt.unwrap();        
+    let destuffed_pkt = destuffed_pkt.unwrap();
     let received_crc = *destuffed_pkt.last().unwrap();
-    let destuffed_pkt_wo_crc = &destuffed_pkt[..destuffed_pkt.len() - 1]; // remove crc from packet       
+    let destuffed_pkt_wo_crc = &destuffed_pkt[..destuffed_pkt.len() - 1]; // remove crc from packet
     if (destuffed_pkt_wo_crc.len() - 3) != destuffed_pkt[2] as usize {
-        return Err(WRONG_LEN)                   
+        return Err(WRONG_LEN)
     }
     if received_crc != crc_vec(&destuffed_pkt_wo_crc.to_vec()) {
-        return Err(WRONG_CRC);           
+        return Err(WRONG_CRC);
     }
     Ok((destuffed_pkt[1], destuffed_pkt_wo_crc[3..].to_vec()))
 }
@@ -222,15 +222,15 @@ mod tests {
         let b = vec![super::FEND, super::FESC, super::TFESC, 1, 2, 3, 4, 5, super::FESC, super::TFEND]; // stuffed_data
         assert_eq!(super::stuffing(&a), b);
     }
-       
+
     #[test]
     fn destuffing_test() {
         let t0 = vec![];                                                                                  // empty
-        let t1 = vec![0x34];                                                                              // 1 byte 
+        let t1 = vec![0x34];                                                                              // 1 byte
         let t2 = vec![                                        1, 2, 3, 4, 5, super::FEND];                // stuffed data without first FEND
         let t3 = vec![super::FEND, super::FESC, super::TFESC, 1, 2, 3, 4, 5, super::FESC];                // stuffed data without last byte
         let t4 = vec![super::FEND, super::FESC,               1, 2, 3, 4, 5, super::FESC, super::TFEND];  // stuffed data with missed 3rd byte
-        let t5 = vec![super::FEND, super::FESC, super::TFESC, 1, 2, 3, 4, 5, super::FESC, super::TFEND];  // well stuffed data 
+        let t5 = vec![super::FEND, super::FESC, super::TFESC, 1, 2, 3, 4, 5, super::FESC, super::TFEND];  // well stuffed data
         let a5 = vec![super::FEND, super::FESC,               1, 2, 3, 4, 5, super::FEND];                // destuffed t5
         assert_eq!(super::destuffing(&t0), Some(vec![]));
         assert_eq!(super::destuffing(&t1), Some(t1));
@@ -275,7 +275,7 @@ mod tests {
             Ok(_w) => panic!("It should be Error"),
             Err(err) => assert_eq!(err, super::CANNOT_FIND_START),
         }
-        
+
         let bad_packet_wrong_stuffing = vec![super::FEND, super::FESC, super::FESC, 1, 2, 3, 4, 5, super::FESC, super::TFEND]; // stuffed packed with wrong 3rd byte
         match super::decode_packet(&bad_packet_wrong_stuffing) {
             Ok(_w) => panic!("It should be Error"),
