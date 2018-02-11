@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn encode_packet_test() {
-        assert_eq!(super::encode_packet(0x03), vec![super::FEND, 0x03, 0x00, 0x6b]); // wo data
+        assert_eq!(super::encode_packet(0x03, &[]), vec![super::FEND, 0x03, 0x00, 0xeb]); // wo data
         assert_eq!(super::encode_packet(0x03, &[1, 2, 3, 4, 5]), vec![super::FEND, 0x03, 0x05, 1, 2, 3, 4, 5, 0x6b]);
     }
 
