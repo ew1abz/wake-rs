@@ -1,10 +1,10 @@
 #![crate_name = "wake"]
 //! Wake protocol library
 
-const FEND: u8     = 0xC0;
-const FESC: u8     = 0xDB;
-const TFEND: u8    = 0xDC;
-const TFESC: u8    = 0xDD;
+const FEND:     u8 = 0xC0;
+const FESC:     u8 = 0xDB;
+const TFEND:    u8 = 0xDC;
+const TFESC:    u8 = 0xDD;
 const CRC_INIT: u8 = 0xDE;
 const PACKET_MIN_LEN: usize = 4;
 
@@ -242,6 +242,7 @@ mod tests {
 
     #[test]
     fn encode_packet_test() {
+        assert_eq!(super::encode_packet(0x03), vec![super::FEND, 0x03, 0x00, 0x6b]); // wo data
         assert_eq!(super::encode_packet(0x03, &[1, 2, 3, 4, 5]), vec![super::FEND, 0x03, 0x05, 1, 2, 3, 4, 5, 0x6b]);
     }
 
