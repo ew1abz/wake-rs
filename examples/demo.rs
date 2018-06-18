@@ -2,8 +2,8 @@ extern crate wake;
 
 use wake::*;
 
-const FEND:  u8    = 0xC0;
-const FESC:  u8    = 0xDB;
+const FEND: u8 = 0xC0;
+const FESC: u8 = 0xDB;
 
 fn print_packet(header: &str, v: &Vec<u8>) {
     print!("\n{}\t", header);
@@ -32,8 +32,10 @@ fn main() {
 
     let decoded = decode_packet(&encoded);
     match decoded {
-        Ok(w) => { print!("\nDecoded packet:\t\tcmd  =  {:02X} ", w.0 );
-                   print_packet("\t\t\tdata = ", &w.1); },
+        Ok(w) => {
+            print!("\nDecoded packet:\t\tcmd  =  {:02X} ", w.0);
+            print_packet("\t\t\tdata = ", &w.1);
+        }
         Err(err) => println!("Error: {:?}", err),
     }
 }

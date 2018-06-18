@@ -171,14 +171,14 @@ pub fn encode_packet(command: u8, data: &[u8]) -> Vec<u8>
 ///
 pub fn decode_packet(received_pkt: &Vec<u8>) -> Result<(u8, Vec<u8>), &str> {
     if received_pkt.len() < PACKET_MIN_LEN {
-         return Err(TOO_SHORT_PACKET)
+        return Err(TOO_SHORT_PACKET)
     }
     if received_pkt[0] != FEND {
-         return Err(CANNOT_FIND_START)
+        return Err(CANNOT_FIND_START)
     }
     let destuffed_pkt = destuffing(&received_pkt);
     if destuffed_pkt == None {
-         return Err(DESTUFFING_FAILED)
+        return Err(DESTUFFING_FAILED)
     }
     let destuffed_pkt = destuffed_pkt.unwrap();
     let received_crc = *destuffed_pkt.last().unwrap();
