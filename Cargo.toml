@@ -1,7 +1,8 @@
 [package]
-name = "wake"
-version = "0.1.0"
+name = "wake-rs"
+version = "0.1.1"
 authors = ["Vladimir K <ew1abz@gmail.com>"]
 
-[dependencies]
-serialport = "2.0.0"
+[dependencies.serialport]
+version = "3.2.0"
+default-features = false

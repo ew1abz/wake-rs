@@ -1,10 +1,11 @@
 //! This example shows how to communicate with device that contan 4 relays.
 extern crate serialport;
-extern crate wake;
+extern crate wake_rs;
 
 use serialport::prelude::*;
 use std::time::Duration;
 use std::thread;
+use wake_rs::*;
 
 const C_INFO: u8 = 0x02;
 const C_RELAYS_SET: u8 = 0x10;
@@ -19,7 +20,8 @@ struct WakeCmd {
 const DO_NOT_CHECK_RX_SIZE: u8 = 0xFF;
 
 fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<(Vec<u8>), &str> {
-    let mut encoded = wake::encode_packet(cmd.code, &cmd.tx);
+    let wp = wake::Packet{addr: None, command: cmd.code, data: Some(vec!{0x00, 0xeb})};
+    let mut encoded = wake::encode_packet(wp);
     p.write(encoded.as_mut_slice()).expect("failed to write message");
     let mut rx = [0; 0xff];
     if let Ok(t) = p.read(&mut rx) {
@@ -67,7 +69,7 @@ fn set_relay(p: &mut SerialPort, relay: u8, mode: u8) -> Result<(), &str> {
 
 fn main() {
     let settings = SerialPortSettings {
-        baud_rate: BaudRate::Baud115200,
+        baud_rate: 115200,
         data_bits: DataBits::Eight,
         flow_control: FlowControl::None,
         parity: Parity::None,
@@ -75,16 +77,17 @@ fn main() {
         timeout: Duration::from_millis(10),
     };
 
-    if let Ok(ports) = serialport::available_ports() {
-        match ports.len() {
-            0 => panic!("No ports found."),
-            1 => println!("Found 1 port:"),
-            n => println!("Found {} ports:", n),
-        };
-        for p in ports.iter() {
-            println!("{:?}", p);
-        }
-        let mut port = serialport::open_with_settings(&ports[0].port_name, &settings);
+    // if let Ok(ports) = serialport::available_ports() {
+    //     match ports.len() {
+    //         0 => panic!("No ports found."),
+    //         1 => println!("Found 1 port:"),
+    //         n => println!("Found {} ports:", n),
+    //     };
+    //     for p in ports.iter() {
+    //         println!("{:?}", p);
+    //     }
+    {
+        let port = serialport::open_with_settings("&ports[0].port_name", &settings);
         match port {
             Ok(mut p) => {
                 match get_info(&mut *p) {
