@@ -1,7 +1,6 @@
 #![crate_name = "wake_rs"]
 //! Wake protocol library
 
-
 // #[repr(u8)]
 // #[derive(Debug, Copy, Clone, PartialEq, Eq, NumFromPrimitive)]
 // pub enum ESC {
@@ -11,49 +10,54 @@
 //     TFESC = 0xDD,
 // }
 
-pub mod errors {
-}
+pub mod errors {}
 
-mod constants {
-}
+mod constants {}
 
 pub mod wake {
     use std::fmt;
     //use constants;
     //use errors;
 
-    const FEND:      u8 = 0xC0;
-    const FESC:      u8 = 0xDB;
-    const TFEND:     u8 = 0xDC;
-    const TFESC:     u8 = 0xDD;
+    const FEND: u8 = 0xC0;
+    const FESC: u8 = 0xDB;
+    const TFEND: u8 = 0xDC;
+    const TFESC: u8 = 0xDD;
     const ADDR_MASK: u8 = 0x80;
-    const CRC_INIT:  u8 = 0xDE;
+    const CRC_INIT: u8 = 0xDE;
     const PACKET_MIN_LEN: usize = 4;
 
-    const TOO_SHORT_PACKET:  &'static str = "Too short packet";
+    const TOO_SHORT_PACKET: &'static str = "Too short packet";
     const CANNOT_FIND_START: &'static str = "Cannot find start of a packet";
     const DESTUFFING_FAILED: &'static str = "De-stuffing failed";
-    const WRONG_LEN:         &'static str = "Wrong packet length";
-    const WRONG_CRC:         &'static str = "Wrong CRC";
+    const WRONG_LEN: &'static str = "Wrong packet length";
+    const WRONG_CRC: &'static str = "Wrong CRC";
 
     pub struct Packet {
         pub addr: Option<u8>,
-        pub command: u8, 
-        pub data: Option<Vec<u8>>
+        pub command: u8,
+        pub data: Option<Vec<u8>>,
     }
 
     impl fmt::Display for Packet {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "ADDR: {} CMD: {} {}", match self.addr{Some(a) => a, None => 0}, self.command,
+            write!(
+                f,
+                "ADDR: {} CMD: {} {}",
+                match self.addr {
+                    Some(a) => a,
+                    None => 0,
+                },
+                self.command,
                 match &self.data {
-                    Some(d) =>  {
+                    Some(d) => {
                         let mut a = "DATA: ";
                         for x in d {
                             format!("{} {:02X}", a, x);
                         }
                         a
-                    },
-                    None => {""},
+                    }
+                    None => "",
                 }
             )
         }
@@ -66,11 +70,14 @@ pub mod wake {
     /// * `crc` - A pre-initialized crc
     /// * `data` - A new data
     ///
-    fn crc8(crc: &mut u8, data: u8)
-    {
+    fn crc8(crc: &mut u8, data: u8) {
         let mut b = data;
         for _ in 0..8 {
-            *crc = if (b ^ *crc) & 1 == 1 { ((*crc ^ 0x18) >> 1) | 0x80 } else { (*crc >> 1) & !0x80 };
+            *crc = if (b ^ *crc) & 1 == 1 {
+                ((*crc ^ 0x18) >> 1) | 0x80
+            } else {
+                (*crc >> 1) & !0x80
+            };
             b = b >> 1;
         }
     }
@@ -128,9 +135,15 @@ pub mod wake {
         let mut stuffed = vec![data[0]];
         for x in &data[1..] {
             match *x {
-                FESC => { stuffed.push(FESC); stuffed.push(TFESC); },
-                FEND => { stuffed.push(FESC); stuffed.push(TFEND); },
-                _    =>   stuffed.push(*x),
+                FESC => {
+                    stuffed.push(FESC);
+                    stuffed.push(TFESC);
+                }
+                FEND => {
+                    stuffed.push(FESC);
+                    stuffed.push(TFEND);
+                }
+                _ => stuffed.push(*x),
             }
         }
         stuffed
@@ -138,7 +151,7 @@ pub mod wake {
 
     #[test]
     fn stuffing_test() {
-        let a = vec![FEND, FESC,        1, 2, 3, 4, 5, FEND];        // initial_data
+        let a = vec![FEND, FESC, 1, 2, 3, 4, 5, FEND]; // initial_data
         let b = vec![FEND, FESC, TFESC, 1, 2, 3, 4, 5, FESC, TFEND]; // stuffed_data
         assert_eq!(stuffing(&a), b);
     }
@@ -161,11 +174,17 @@ pub mod wake {
                 FESC => {
                     if i > (data.len() - 2) {
                         return None;
-                        }
+                    }
                     match data[i + 1] {
-                        TFESC => { output.push(FESC); i += 1; },
-                        TFEND => { output.push(FEND); i += 1; },
-                        _     => return None,
+                        TFESC => {
+                            output.push(FESC);
+                            i += 1;
+                        }
+                        TFEND => {
+                            output.push(FEND);
+                            i += 1;
+                        }
+                        _ => return None,
                     }
                 }
                 _ => output.push(data[i]),
@@ -177,13 +196,13 @@ pub mod wake {
 
     #[test]
     fn destuffing_test() {
-        let t0 = vec![];                                               // empty
-        let t1 = vec![0x34];                                           // 1 byte
-        let t2 = vec![                   1, 2, 3, 4, 5, FEND];         // stuffed data without first FEND
-        let t3 = vec![FEND, FESC, TFESC, 1, 2, 3, 4, 5, FESC];         // stuffed data without last byte
-        let t4 = vec![FEND, FESC,        1, 2, 3, 4, 5, FESC, TFEND];  // stuffed data with missed 3rd byte
-        let t5 = vec![FEND, FESC, TFESC, 1, 2, 3, 4, 5, FESC, TFEND];  // well stuffed data
-        let a5 = vec![FEND, FESC,               1, 2, 3, 4, 5, FEND];  // destuffed t5
+        let t0 = vec![]; // empty
+        let t1 = vec![0x34]; // 1 byte
+        let t2 = vec![1, 2, 3, 4, 5, FEND]; // stuffed data without first FEND
+        let t3 = vec![FEND, FESC, TFESC, 1, 2, 3, 4, 5, FESC]; // stuffed data without last byte
+        let t4 = vec![FEND, FESC, 1, 2, 3, 4, 5, FESC, TFEND]; // stuffed data with missed 3rd byte
+        let t5 = vec![FEND, FESC, TFESC, 1, 2, 3, 4, 5, FESC, TFEND]; // well stuffed data
+        let a5 = vec![FEND, FESC, 1, 2, 3, 4, 5, FEND]; // destuffed t5
         assert_eq!(destuffing(&t0), Some(vec![]));
         assert_eq!(destuffing(&t1), Some(t1));
         assert_eq!(destuffing(&t2), Some(t2));
@@ -206,33 +225,34 @@ pub mod wake {
     ///
     /// ```
     /// extern crate wake_rs;
-    /// 
+    ///
     /// use wake_rs::*;
-    /// 
+    ///
     /// let p = wake::Packet{addr: Some(0x12), command: 3, data: Some(vec!{0x00, 0xeb})};
     /// let mut encoded_packet: Vec<u8> = wake::encode_packet(p);
     /// ```
     /// *TODO*: Add address support
     ///
-    pub fn encode_packet(packet: Packet) -> Vec<u8>
-    {
+    pub fn encode_packet(packet: Packet) -> Vec<u8> {
         let mut encoded_packet = vec![];
         // 1. FEND
         encoded_packet.push(FEND);
         // 2. Address, if exists
         match packet.addr {
-            Some(addr) => encoded_packet.push(addr as u8 | ADDR_MASK), 
-            None => {},
+            Some(addr) => encoded_packet.push(addr as u8 | ADDR_MASK),
+            None => {}
         }
         // 3. Command
         encoded_packet.push(packet.command);
         // 4. Data length; data, if exists
         match packet.data {
             Some(d) => {
-                encoded_packet.push(d.len() as u8); 
+                encoded_packet.push(d.len() as u8);
                 encoded_packet.extend(d.iter().cloned());
-                },
-            None => {encoded_packet.push(0);},
+            }
+            None => {
+                encoded_packet.push(0);
+            }
         }
         // 5. CRC
         let crc = crc(&encoded_packet);
@@ -243,9 +263,16 @@ pub mod wake {
 
     #[test]
     fn encode_packet_test_wp() {
-        let wp = Packet{addr: Some(0x12), command: 3, data: Some(vec!{0x00, 0xeb})};
+        let wp = Packet {
+            addr: Some(0x12),
+            command: 3,
+            data: Some(vec![0x00, 0xeb]),
+        };
         print!("{}", wp);
-        assert_eq!(encode_packet(wp), vec![FEND, 0x92, 0x03, 0x02, 0x00, 0xeb, 114]);
+        assert_eq!(
+            encode_packet(wp),
+            vec![FEND, 0x92, 0x03, 0x02, 0x00, 0xeb, 114]
+        );
     }
 
     // /// Encode packet to wake format
@@ -263,7 +290,7 @@ pub mod wake {
     // ///
     // /// ```
     // /// extern crate wake_rs;
-    // /// 
+    // ///
     // /// use wake_rs::*;
     // /// let mut wake_packet: Vec<u8> = wake::encode_packet(0x03, Some(&[1, 2, 3, 4, 5]));
     // /// ```
@@ -274,7 +301,7 @@ pub mod wake {
     //     let mut encoded_packet = vec![FEND, command];
     //     match data {
     //         Some(d) => {
-    //             encoded_packet.push(d.len() as u8); 
+    //             encoded_packet.push(d.len() as u8);
     //             encoded_packet.extend(d.iter().cloned());
     //             },
     //         None => {encoded_packet.push(0);},
@@ -305,7 +332,7 @@ pub mod wake {
     ///
     /// ```
     /// extern crate wake_rs;
-    /// 
+    ///
     /// use wake_rs::*;
     /// let encoded_packet = vec![0xC0, 0x03, 0x05, 1, 2, 3, 4, 5, 0x6b];
     /// let decoded_packet = wake::decode_packet(&encoded_packet);
@@ -324,20 +351,20 @@ pub mod wake {
     ///
     pub fn decode_packet(received_pkt: &Vec<u8>) -> Result<(u8, Vec<u8>), &str> {
         if received_pkt.len() < PACKET_MIN_LEN {
-            return Err(TOO_SHORT_PACKET)
+            return Err(TOO_SHORT_PACKET);
         }
         if received_pkt[0] != FEND {
-            return Err(CANNOT_FIND_START)
+            return Err(CANNOT_FIND_START);
         }
         let destuffed_pkt = destuffing(&received_pkt);
         if destuffed_pkt == None {
-            return Err(DESTUFFING_FAILED)
+            return Err(DESTUFFING_FAILED);
         }
         let destuffed_pkt = destuffed_pkt.unwrap();
         let received_crc = *destuffed_pkt.last().unwrap();
         let destuffed_pkt_wo_crc = &destuffed_pkt[..destuffed_pkt.len() - 1]; // remove crc from packet
         if (destuffed_pkt_wo_crc.len() - 3) != destuffed_pkt[2] as usize {
-            return Err(WRONG_LEN)
+            return Err(WRONG_LEN);
         }
         if received_crc != crc(&destuffed_pkt_wo_crc.to_vec()) {
             return Err(WRONG_CRC);
@@ -357,7 +384,10 @@ pub mod wake {
         good_packet.extend_from_slice(&data);
         good_packet.extend_from_slice(&crc);
         match decode_packet(&good_packet) {
-            Ok(w) => { assert_eq!(w.0, command); assert_eq!(w.1, data); },
+            Ok(w) => {
+                assert_eq!(w.0, command);
+                assert_eq!(w.1, data);
+            }
             Err(err) => panic!("Error: {:?}", err),
         }
 

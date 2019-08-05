@@ -3,8 +3,8 @@ extern crate serialport;
 extern crate wake_rs;
 
 use serialport::prelude::*;
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 use wake_rs::*;
 
 const C_INFO: u8 = 0x02;
@@ -20,9 +20,14 @@ struct WakeCmd {
 const DO_NOT_CHECK_RX_SIZE: u8 = 0xFF;
 
 fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<(Vec<u8>), &str> {
-    let wp = wake::Packet{addr: None, command: cmd.code, data: Some(vec!{0x00, 0xeb})};
+    let wp = wake::Packet {
+        addr: None,
+        command: cmd.code,
+        data: Some(vec![0x00, 0xeb]),
+    };
     let mut encoded = wake::encode_packet(wp);
-    p.write(encoded.as_mut_slice()).expect("failed to write message");
+    p.write(encoded.as_mut_slice())
+        .expect("failed to write message");
     let mut rx = [0; 0xff];
     if let Ok(t) = p.read(&mut rx) {
         if let Ok(decoded) = wake::decode_packet(&rx[..t].to_vec()) {
