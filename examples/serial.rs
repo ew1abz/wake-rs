@@ -6,11 +6,17 @@ use serialport::prelude::*;
 use std::io::Write;
 use std::thread;
 use std::time::Duration;
+use wake::{Decode, Encode};
 
-fn print_packet(header: &str, v: &Vec<u8>) {
+fn print_packet(header: &str, v: Option<&Vec<u8>>) {
     print!("\n{}:\t", header);
-    for x in v {
-        print!("{:02X} ", x);
+    match v {
+        Some(data) => {
+            for x in data {
+                print!("{:02X} ", x);
+            }
+        }
+        None => print!("[]"),
     }
 }
 
@@ -25,21 +31,24 @@ fn main() {
     };
 
     let port = serialport::open_with_settings("/dev/ttyS2", &settings);
-    let cmd_version = wake::encode_packet(wake::Packet {
+    let cmd_version = wake::Packet {
         address: None,
         command: 0x01,
         data: None,
-    });
-    let cmd_start = wake::encode_packet(wake::Packet {
+    }
+    .encode();
+    let cmd_start = wake::Packet {
         address: None,
         command: 0x02,
         data: Some(vec![10, 10]),
-    });
-    let cmd_stop = wake::encode_packet(wake::Packet {
+    }
+    .encode();
+    let cmd_stop = wake::Packet {
         address: None,
         command: 0x02,
         data: Some(vec![0, 0]),
-    });
+    }
+    .encode();
 
     match port {
         Ok(mut p) => {
@@ -61,10 +70,10 @@ fn main() {
                 p.write(cmd.as_mut_slice())
                     .expect("failed to write message");
                 if let Ok(t) = p.read(rx.as_mut_slice()) {
-                    print_packet("RAW RX", &rx[..t].to_vec());
-                    if let Ok(d) = wake::decode_packet(&rx[..t].to_vec()) {
+                    print_packet("RAW RX", Some(&rx[..t].to_vec()));
+                    if let Ok(d) = &rx[..t].to_vec().decode() {
                         print!("\nDecoded CMD {}", d.command);
-                        print_packet("Decoded data", &d.data.unwrap());
+                        print_packet("Decoded data", d.data.as_ref());
                     }
                 }
                 print!("\n------------");
