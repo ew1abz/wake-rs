@@ -1,13 +1,13 @@
-image: rust:1.36
+image: rust:1.57
 
 pipelines:
   branches:
     master:
       - step:
           script:
-            # - echo "Update docker image"              ; apt update ; apt upgrade -y ; apt install libudev-dev -y
-            # - echo "Updates to rustup"                ; rustup self update
-            # - echo "Update Rust toolchain"            ; rustup update
+            - echo "Update docker image"              ; apt update ; apt upgrade -y ; apt install libudev-dev -y
+            - echo "Updates to rustup"                ; rustup self update
+            - echo "Update Rust toolchain"            ; rustup update
             - echo "Add rustfmt"                      ; rustup component add rustfmt
             - echo "Check code format"                ; cargo fmt --all -- --check
             - echo "Build project"                    ; cargo build --release
