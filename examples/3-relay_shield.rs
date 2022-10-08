@@ -9,12 +9,12 @@
 
 extern crate rand;
 extern crate serialport;
-extern crate wakers;
+extern crate wake_rs;
 
 use rand::Rng;
 use std::thread;
 use std::time::Duration;
-use wakers::{Decode, Encode};
+use wake_rs::{Decode, Encode, Packet, DATA_MAX_LEN};
 
 const MODE_MAX: u8 = 5;
 const RELAY_NUM: u8 = 4;
@@ -28,15 +28,15 @@ struct RelayCmd {
 
 impl RelayCmd {
     fn send(&self, p: &mut dyn serialport::SerialPort) -> Result<Option<Vec<u8>>, &str> {
-        let wp = wakers::Packet {
+        let wp = Packet {
             address: None,
             command: self.command,
             data: self.data_tx.clone(),
         };
-        p.write(wp.encode().as_mut_slice())
+        p.write(wp.encode().unwrap().as_mut_slice())
             .expect("failed to write");
 
-        let mut rx = [0; wakers::DATA_MAX_LEN];
+        let mut rx = [0; DATA_MAX_LEN];
         let rx_len = p.read(&mut rx).expect("failed to read");
         let decoded = rx[..rx_len].to_vec().decode().expect("failed to decode");
         if decoded.command != wp.command {

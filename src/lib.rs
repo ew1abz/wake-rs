@@ -1,5 +1,6 @@
-#![crate_name = "wakers"]
-//! Wake protocol library
+#![crate_name = "wake_rs"]
+//! `Wake` is a serial communication protocol highly optimized for microcontrollers.
+//! `wake-rs` is a library written in Rust for encoding/decoding Wake protocol packets.
 
 #[cfg(test)]
 extern crate rand;
@@ -16,8 +17,11 @@ const TFESC: u8 = 0xDD;
 const ADDR_MASK: u8 = 0x80;
 const CRC_INIT: u8 = 0xDE;
 const PACKET_MIN_LEN: usize = 4;
+
+/// Maximum supported data length. Might be reduced depends on available resources.
 pub const DATA_MAX_LEN: usize = 0xff;
 
+/// Wake decoder/encoder errors
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum WakeError {
     TooShortPacket,
@@ -25,6 +29,8 @@ pub enum WakeError {
     DestuffingFailed,
     WrongPacketLength,
     WrongPacketCrc,
+    WrongAddrRange,
+    WrongCmdRange,
 }
 
 impl std::error::Error for WakeError {
@@ -35,6 +41,8 @@ impl std::error::Error for WakeError {
             WakeError::DestuffingFailed => "De-stuffing failed",
             WakeError::WrongPacketLength => "Wrong packet length",
             WakeError::WrongPacketCrc => "Wrong packet CRC",
+            WakeError::WrongAddrRange => "Address is out of range [0 - 127]",
+            WakeError::WrongCmdRange => "Command is out of range [0 - 127]",
         }
     }
 }
@@ -45,14 +53,19 @@ impl fmt::Display for WakeError {
     }
 }
 
+/// Wake packet: address, command, and data
 #[derive(Default)]
 pub struct Packet {
+    /// Device address (optional) [0 - 127]
     pub address: Option<u8>,
+    /// Command [0 - 127]
     pub command: u8,
+    /// Data load (optional)
     pub data: Option<Vec<u8>>,
 }
 
 impl fmt::Display for Packet {
+    /// Show error in human readable format
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let addr = match self.address {
             Some(a) => format!("ADDR: 0x{:02X}", a),
@@ -81,27 +94,17 @@ impl fmt::Display for Packet {
     }
 }
 
-pub trait Decode {
-    fn decode(&self) -> Result<Packet, WakeError>;
-}
-
-pub trait Encode {
-    fn encode(&self) -> Vec<u8>;
-}
-
 trait Wake {
-    // TODO: change the name?
     fn crc(&self) -> u8;
     fn stuff(&self) -> Vec<u8>;
     fn dry(&self) -> Result<Vec<u8>, WakeError>;
 }
 
+/// Calculate CRC sum of data in a vector
 impl Wake for Vec<u8> {
-    /// Calculate CRC sum of data in a vector
+    /// # Input
     ///
-    /// # Arguments
-    ///
-    /// * `data: &Vec<u8>` - input data
+    /// * 'Vec<u8>` - input data
     ///
     /// # Output
     ///
@@ -193,22 +196,22 @@ impl Wake for Vec<u8> {
     }
 }
 
+/// Decode data from wake format to wake packet structure
+pub trait Decode {
+    fn decode(&self) -> Result<Packet, WakeError>;
+}
+
+/// Decode Vec<u8> from wake format to wake packet structure
 impl Decode for Vec<u8> {
-    /// Decode packet from wake format to wake structure
-    ///
-    /// # Arguments
-    ///
-    /// * `received_pkt: &Vec<u8>` - Input data in wake format
-    ///
     /// # Output
     ///
-    /// * `Result<(u8, Vec<u8>), WakeError>` - command, data or error
+    /// * `Result<Packet, WakeError>` - command, data or error
     ///
     /// # Example
     ///
     /// ```
-    /// extern crate wakers;
-    /// use wakers::Decode;
+    /// extern crate wake_rs;
+    /// use wake_rs::Decode;
     ///
     /// let encoded_packet = vec![0xC0, 0x03, 0x05, 1, 2, 3, 4, 5, 0x6b];
     /// let decoded_packet = encoded_packet.decode();
@@ -226,7 +229,7 @@ impl Decode for Vec<u8> {
             return Err(WakeError::TooShortPacket);
         }
         // 2: Check START symbol (FEND)
-        if self[0] != FEND as u8 {
+        if self[0] != FEND {
             return Err(WakeError::CannotFindStart);
         }
         // 3: Dry packet (remove stuffed bytes)
@@ -269,12 +272,16 @@ impl Decode for Vec<u8> {
     }
 }
 
+/// Encode packet to wake format
+pub trait Encode {
+    fn encode(&self) -> Result<Vec<u8>, WakeError>;
+}
+
+/// Encode packet to wake format
 impl Encode for Packet {
-    /// Encode packet to wake format
+    /// # Input
     ///
-    /// # Arguments
-    ///
-    /// * `packet` - Packet with address, command code and data. Address and data are not mandatory.
+    /// * Wake packet structure with address, command code and data. Address and data are optional.
     ///
     /// # Output
     ///
@@ -283,22 +290,28 @@ impl Encode for Packet {
     /// # Example
     ///
     /// ```
-    /// extern crate wakers;
-    /// use wakers::Encode;
+    /// extern crate wake_rs;
+    /// use wake_rs::Encode;
     ///
-    /// let p = wakers::Packet{address: Some(0x12), command: 3, data: Some(vec!{0x00, 0xeb})};
-    /// let mut encoded_packet: Vec<u8> = p.encode();
+    /// let p = wake_rs::Packet{address: Some(0x12), command: 3, data: Some(vec!{0x00, 0xeb})};
+    /// let encoded_packet: Vec<u8> = p.encode().unwrap();
     /// ```
     ///
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self) -> Result<Vec<u8>, WakeError> {
         let mut encoded_packet: Vec<u8> = vec![];
         // 1. FEND
         encoded_packet.push(FEND);
         // 2. Address, if exists
         if let Some(addr) = self.address {
+            if addr > 0x7f {
+                return Err(WakeError::WrongAddrRange);
+            }
             encoded_packet.push(addr | ADDR_MASK);
         }
         // 3. Command
+        if self.command > 0x7f {
+            return Err(WakeError::WrongCmdRange);
+        }
         encoded_packet.push(self.command);
         // 4. Data length; data, if exists
         match &self.data {
@@ -311,7 +324,7 @@ impl Encode for Packet {
         // 5. CRC
         encoded_packet.push(encoded_packet.crc());
         // 6. Stuffing
-        encoded_packet.stuff()
+        Ok(encoded_packet.stuff())
     }
 }
 
@@ -367,34 +380,51 @@ fn dry_test() {
 }
 #[test]
 fn encode_packet_test() {
+    // address is out of range
+    let wp = Packet {
+        address: Some(128),
+        command: 9,
+        data: Some(vec![0x12, 0x34]),
+    };
+    assert_eq!(wp.encode(), Err(WakeError::WrongAddrRange));
+    // command is out of range
+    let wp = Packet {
+        address: None,
+        command: 128,
+        data: Some(vec![0x12, 0x34]),
+    };
+    assert_eq!(wp.encode(), Err(WakeError::WrongCmdRange));
     // without address
     let wp = Packet {
         address: None,
         command: 9,
         data: Some(vec![0x12, 0x34]),
     };
-    assert_eq!(wp.encode(), vec![FEND, 0x09, 0x02, 0x12, 0x34, 160]);
+    assert_eq!(wp.encode(), Ok(vec![FEND, 0x09, 0x02, 0x12, 0x34, 160]));
     // with data
     let wp = Packet {
         address: Some(0x12),
         command: 3,
         data: Some(vec![0x00, 0xeb]),
     };
-    assert_eq!(wp.encode(), vec![FEND, 0x92, 0x03, 0x02, 0x00, 0xeb, 114]);
+    assert_eq!(
+        wp.encode(),
+        Ok(vec![FEND, 0x92, 0x03, 0x02, 0x00, 0xeb, 114])
+    );
     // empty packet
     let wp = Packet {
         address: Some(0x13),
         command: 4,
         data: None,
     };
-    assert_eq!(wp.encode(), vec![FEND, 0x93, 0x04, 0x00, 218]);
+    assert_eq!(wp.encode(), Ok(vec![FEND, 0x93, 0x04, 0x00, 218]));
     // empty packet with stuffing
     let wp = Packet {
-        address: Some(0x14),
-        command: 0xc0,
+        address: Some(0x40),
+        command: 0x40,
         data: None,
     };
-    assert_eq!(wp.encode(), vec![FEND, 0x94, 219, 220, 0x00, 47]);
+    assert_eq!(wp.encode(), Ok(vec![FEND, FESC, TFEND, 0x40, 0x00, 229]));
 }
 
 #[test]
@@ -462,6 +492,15 @@ fn decode_w_address_test() {
     assert_eq!(decoded.address.unwrap(), address);
     assert_eq!(decoded.command, command);
     assert_eq!(decoded.data.unwrap(), data);
+
+    // 0x40 test
+    let good_packet = vec![FEND, FESC, TFEND, 0x40, 0x00, 229];
+    let decoded = good_packet.decode();
+    assert_eq!(decoded.is_ok(), true);
+    let decoded = decoded.unwrap();
+    assert_eq!(decoded.address.unwrap(), 0x40);
+    assert_eq!(decoded.command, 0x40);
+    assert_eq!(decoded.data, None);
 }
 
 #[test]
@@ -486,7 +525,7 @@ fn random_encode_decode_test() {
             data: if d.len() == 0 { None } else { Some(d.clone()) },
         };
         // print!("{}\n", &wp);
-        let encoded = wp.encode();
+        let encoded = wp.encode().unwrap();
         let decoded = encoded.decode().unwrap();
         assert_eq!(decoded.address, wp.address);
         assert_eq!(decoded.command, wp.command);

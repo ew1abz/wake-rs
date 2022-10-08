@@ -3,12 +3,12 @@
 //! 2. Run this example `cargo run --example 2-serial`
 
 extern crate serialport;
-extern crate wakers;
+extern crate wake_rs;
 
 use std::io::Write;
 use std::thread;
 use std::time::Duration;
-use wakers::{Decode, Encode};
+use wake_rs::{Decode, Encode, Packet};
 
 fn print_packet(header: &str, v: Option<&Vec<u8>>) {
     print!("\n{}:\t", header);
@@ -23,26 +23,30 @@ fn print_packet(header: &str, v: Option<&Vec<u8>>) {
 }
 
 fn main() {
-    let cmd_version = wakers::Packet {
+    let cmd_version = Packet {
         address: None,
         command: 0x01,
         data: None,
     }
-    .encode();
+    .encode()
+    .unwrap();
 
-    let cmd_start = wakers::Packet {
+    let cmd_start = Packet {
         address: None,
         command: 0x02,
         data: Some(vec![10, 10]),
     }
-    .encode();
+    .encode()
+    .unwrap();
 
-    let cmd_stop = wakers::Packet {
+    let cmd_stop = Packet {
         address: None,
         command: 0x02,
         data: Some(vec![0, 0]),
     }
-    .encode();
+    .encode()
+    .unwrap();
+
     let mut commands = [cmd_version, cmd_start, cmd_stop];
 
     let mut port = serialport::new("COM4", 9600)
