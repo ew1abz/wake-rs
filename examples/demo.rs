@@ -1,10 +1,13 @@
 extern crate wake;
 
-fn print_packet(header: &str, v: &Vec<u8>) {
+use wake::{Decode, Encode};
+
+fn print_hex_buffer(header: &str, v: &Vec<u8>) {
     print!("\n{}\t", header);
     for x in v {
         print!("{:02X} ", x);
     }
+    println!("");
 }
 
 /// Simple wake_rs API demo
@@ -14,9 +17,10 @@ fn main() {
         command: 3,
         data: Some(vec![0x00, 0xeb]),
     };
-    let encoded = wake::encode_packet(wp);
-    print_packet("Encoded packet:\t", &encoded);
 
-    let decoded = wake::decode_packet(&encoded);
+    let encoded = wp.encode();
+    print_hex_buffer("Encoded packet:\t", &encoded);
+
+    let decoded = encoded.decode();
     println!("Decoded packet: {}", decoded.unwrap());
 }
