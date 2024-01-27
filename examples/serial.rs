@@ -1,11 +1,11 @@
 extern crate serialport;
-extern crate wake;
+extern crate wake_rs;
 
 use std::io::Write;
 use serialport::prelude::*;
 use std::time::Duration;
 use std::thread;
-use wake::*;
+use wake_rs::*;
 
 fn print_packet(header: &str, v: &Vec<u8>) {
     print!("\n{}:\t", header);
@@ -17,7 +17,7 @@ fn print_packet(header: &str, v: &Vec<u8>) {
 /// Main function doc string
 fn main() {
     let settings = SerialPortSettings {
-        baud_rate: BaudRate::Baud115200,
+        baud_rate: 115200,
         data_bits: DataBits::Eight,
         flow_control: FlowControl::None,
         parity: Parity::None,
@@ -25,44 +25,39 @@ fn main() {
         timeout: Duration::from_millis(10),
     };
 
-    if let Ok(ports) = serialport::available_ports() {
-        match ports.len() {
-            0 => panic!("No ports found."),
-            1 => println!("Found 1 port:"),
-            n => println!("Found {} ports:", n),
-        };
-        for p in ports.iter() {
-            println!("{:?}", p);
-        }
-        let mut port = serialport::open_with_settings(&ports[0].port_name, &settings);
-        match port {
-            Ok(mut p) => {
-                println!("Port is opened");
-                let mut tx: Vec<u8> = vec![0; 2];
-                let mut rx: Vec<u8> = vec![0; 64];
+    let port = serialport::open_with_settings("/dev/ttyS2", &settings);
+    let cmd_version = wake::encode_packet(wake::Packet{addr: None, command: 0x01, data: None});
+    let cmd_start   = wake::encode_packet(wake::Packet{addr: None, command: 0x02, data: Some(vec!{10,10})});
+    let cmd_stop    = wake::encode_packet(wake::Packet{addr: None, command: 0x02, data: Some(vec!{0,0})});
 
-                loop {
-                    tx[1] += 1; // relay mode
-                    tx[1] &= 7;
-                    if tx[1] == 0 {
-                        tx[0] += 1; // relay number
-                        tx[0] &= 3;
-                    }
-                    print!("\nRelay {} Mode {}", tx[0], tx[1]);
-                    let mut encoded = encode_packet(0x10, &tx);
-                    p.write(encoded.as_mut_slice()).expect("failed to write message");
-                    if let Ok(t) = p.read(rx.as_mut_slice()) {
-                        print_packet("RAW RX", &rx[..t].to_vec());
-                        if let Ok(d) = decode_packet(&rx[..t].to_vec()) {
-                            print!("\nDecoded CMD {}", d.0);
-                            print_packet("Decoded data", &d.1);
-                        }
-                    }
-                    print!("\n------------");
-                    thread::sleep(Duration::from_millis(5000));
+    match port {
+        Ok(mut p) => {
+            println!("Port is opened");
+            let mut rx: Vec<u8> = vec![0; 64];
+            let mut cmd: Vec<u8>;
+
+            let mut state: u8 = 0;
+            loop {
+                // let mut encoded = encode_packet(0x01, &tx);
+                // let mut encoded = wake::encode_packet(cmdVersion);
+                match state {
+                    1 => cmd = cmd_start.clone(),
+                    2 => cmd = cmd_stop.clone(),
+                    _ => {state = 0; cmd = cmd_version.clone()},
                 }
+                state += 1;
+                p.write(cmd.as_mut_slice()).expect("failed to write message");
+                if let Ok(t) = p.read(rx.as_mut_slice()) {
+                    print_packet("RAW RX", &rx[..t].to_vec());
+                    if let Ok(d) = wake::decode_packet(&rx[..t].to_vec()) {
+                        print!("\nDecoded CMD {}", d.0);
+                        print_packet("Decoded data", &d.1);
+                    }
+                }
+                print!("\n------------");
+                thread::sleep(Duration::from_millis(5000));
             }
-            Err(_e) => panic!("Error: Port not available"),
         }
+        Err(_e) => panic!("Error: Port not available"),
     }
 }
