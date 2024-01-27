@@ -1,0 +1,19 @@
+image: rustlang/rust:nightly
+
+pipelines:
+  branches:
+    master:
+      - step:
+          script:
+            - echo "Updates to rustup"                ; rustup self update
+            - echo "Update Rust toolchain"            ; rustup update
+            #- echo "Setup git with read/write access" ; ./scripts/setup-git.sh
+            - echo "Build project"                    ; cargo build --release
+            #- echo "Format source code"               ; ./scripts/fmt.sh
+            - echo "Run unit tests"                   ; cargo test --lib --release -v --no-fail-fast -- --nocapture --test
+            - echo "Run documentation tests"          ; cargo test --doc --release -v --no-fail-fast -- --nocapture --test
+            #- echo "Run integration tests"            ; cargo test --test ${CARGO_LIB_NAME} --release -v --no-fail-fast -- --nocapture --test
+            #- echo "Run benchmark tests"              ; cargo test --lib --release -v --no-fail-fast -- --nocapture --bench
+            #- echo "Publish documentation"            ; ./scripts/docs.sh
+            #- echo "Upload to crates.io"              ; ./scripts/crates-io.sh
+            # TODO: - echo "Deploy to AWS"            ; ./scripts/aws.sh
