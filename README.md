@@ -1,5 +1,9 @@
 # wake-rs
 
+[![crates.io](https://img.shields.io/crates/v/wake-rs.svg)](https://crates.io/crates/wake-rs)
+[![docs.rs](https://img.shields.io/badge/docs.rs-wake%2D-rs-f2049b?logo=docs.rs)](https://docs.rs/wake-rs)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 `wake-rs` is a library written in Rust for encoding/decoding Wake protocol.
 
 `Wake` is a serial communication protocol highly optimized for **microcontrollers**. It based on SLIP protocol (<https://datatracker.ietf.org/doc/html/rfc1055>).
@@ -43,17 +47,40 @@ in many languages:
 
 1. Demo - basic usage
 2. Serial - how to use with serial port
-3. Relay shield - real device communication
+3. Relay shield - PC <-> device communication
 
-## Build
+## Quick Start
 
-### Library
+Add to your Rust project:
+
+```bash
+cargo add systemd-wake
+```
+
+Create, encode and decode packet:
+
+```rust
+use wake_rs::{Decode, Encode};
+
+fn main() {
+    let wp = wake_rs::Packet {
+        address: Some(0x12),
+        command: 3,
+        data: Some(vec![0x00, 0xeb]),
+    };
+
+    let encoded = wp.encode().unwrap();
+    let decoded = encoded.decode();
+}
+```
+
+Build library:
 
 ```bash
 cargo build --release
 ```
 
-### Examples
+Build examples:
 
 ```bash
 cargo build --examples
@@ -65,7 +92,7 @@ Protocol description, libraries, and tools: <http://www.leoniv.diod.club/article
 
 ## TODO
 
-- Use this library with a microcontroller (Rust project)
+- Use this library with a microcontroller (nostd)
 - Add a stream decoder (one byte per time with internal buffer)
 
 ## License

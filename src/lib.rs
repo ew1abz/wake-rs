@@ -77,9 +77,7 @@ impl fmt::Display for Packet {
         let data = match &self.data {
             Some(d) => {
                 let mut print = format!("DATA: {} bytes\n", d.len());
-                print.push_str(&format!(
-                    "     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f"
-                ));
+                print.push_str("     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f");
                 for (i, item) in d.iter().enumerate() {
                     if (i == 0) | (i % 16 == 0) {
                         print.push_str(&format!("\n{:02x}: ", i));
@@ -88,7 +86,7 @@ impl fmt::Display for Packet {
                 }
                 print
             }
-            None => format!("DATA: none"),
+            None => ("DATA: none").to_string(),
         };
         write!(f, "{}\n{}\n{}\n", addr, cmd, data)
     }
@@ -121,7 +119,7 @@ impl Wake for Vec<u8> {
                 } else {
                     (crc >> 1) & !0x80
                 };
-                b = b >> 1;
+                b >>= 1;
             }
         };
 
@@ -142,7 +140,7 @@ impl Wake for Vec<u8> {
     /// * `Vec<u8>` - output data
     ///
     fn stuff(&self) -> Vec<u8> {
-        assert_eq!(self.len() >= (PACKET_MIN_LEN - 1), true); // without CRC
+        assert!(self.len() >= (PACKET_MIN_LEN - 1)); // without CRC
         assert_eq!(self[0], FEND);
         let mut stuffed: Vec<u8> = vec![self[0]];
         for x in &self[1..] {
@@ -238,20 +236,20 @@ impl Decode for Vec<u8> {
         v_iter.next(); // skip start symbol
                        // 4: Get an address (if exists) and a command
         let mut decoded = Packet::default();
-        let (_, d) = v_iter.next().ok_or_else(|| WakeError::TooShortPacket)?;
+        let (_, d) = v_iter.next().ok_or(WakeError::TooShortPacket)?;
         match d {
             addr @ ADDR_MASK..=0xff => {
                 decoded.address = Some(addr & !ADDR_MASK);
-                let (_, cmd) = v_iter.next().ok_or_else(|| WakeError::TooShortPacket)?;
+                let (_, cmd) = v_iter.next().ok_or(WakeError::TooShortPacket)?;
                 decoded.command = *cmd;
             }
-            cmd @ _ => {
+            cmd => {
                 decoded.address = None;
                 decoded.command = *cmd;
             }
         };
         // 5: Get data length
-        let (i, data_len) = v_iter.next().ok_or_else(|| WakeError::TooShortPacket)?;
+        let (i, data_len) = v_iter.next().ok_or(WakeError::TooShortPacket)?;
         // 8: Check data length
         if (destuffed_pkt.len() - i - 2) != *data_len as usize {
             return Err(WakeError::WrongPacketLength);
