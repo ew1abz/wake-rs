@@ -1,7 +1,7 @@
 extern crate serialport;
 extern crate wake;
 
-use std::io::{Write};
+use std::io::Write;
 use serialport::prelude::*;
 use std::time::Duration;
 use std::thread;
@@ -47,13 +47,13 @@ fn main() {
                     if tx[1] == 0 {
                         tx[0] += 1; // relay number
                         tx[0] &= 3;
-                     }
-                    print!("\nRelay {} Mode {}", tx[0],  tx[1]);
+                    }
+                    print!("\nRelay {} Mode {}", tx[0], tx[1]);
                     let mut encoded = encode_packet(0x10, &tx);
                     p.write(encoded.as_mut_slice()).expect("failed to write message");
                     if let Ok(t) = p.read(rx.as_mut_slice()) {
                         print_packet("RAW RX", &rx[..t].to_vec());
-                        if let Ok(d) = decode_packet(&rx[..t].to_vec()) {// -> Result<(u8, Vec<u8>), &str> {
+                        if let Ok(d) = decode_packet(&rx[..t].to_vec()) {
                             print!("\nDecoded CMD {}", d.0);
                             print_packet("Decoded data", &d.1);
                         }
@@ -61,8 +61,8 @@ fn main() {
                     print!("\n------------");
                     thread::sleep(Duration::from_millis(5000));
                 }
-            },
+            }
             Err(_e) => panic!("Error: Port not available"),
         }
-     }
+    }
 }
