@@ -35,14 +35,20 @@ fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<Option<V
             }
             if cmd.need_rx != DO_NOT_CHECK_RX_SIZE {
                 match decoded.data {
-                    Some(data) => if data.len() != cmd.need_rx as usize {
+                    Some(data) => {
+                        if data.len() != cmd.need_rx as usize {
                             return Err("need_rx != real_rx");
-                            } else {return Ok(Some(data));}
-                    None => if cmd.need_rx as usize != 0 {
-                        return Err("need_rx != real_rx");
+                        } else {
+                            return Ok(Some(data));
+                        }
+                    }
+                    None => {
+                        if cmd.need_rx as usize != 0 {
+                            return Err("need_rx != real_rx");
+                        }
                     }
                 }
-            }            
+            }
         }
     }
     Err("Cannot read")
