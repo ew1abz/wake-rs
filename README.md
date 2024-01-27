@@ -1,6 +1,6 @@
-# wakers
+# wake-rs
 
-`wakers` is a library written in Rust for encoding/decoding Wake protocol packets.
+`wake-rs` is a library written in Rust for encoding/decoding Wake protocol.
 
 `Wake` is a serial communication protocol highly optimized for **microcontrollers**. It based on SLIP protocol (<https://datatracker.ietf.org/doc/html/rfc1055>).
 
@@ -26,12 +26,10 @@ Frame structure:
 
 There are many architecture-specific implementations:
 
-|
 - MCS-51
 - AVR
 - STM32
 - x86
-|
 
 in many languages:
 
@@ -64,6 +62,11 @@ cargo build --examples
 ## Resources
 
 Protocol description, libraries, and tools: <http://www.leoniv.diod.club/articles/wake/wake.html>
+
+## TODO
+
+- Use this library with a microcontroller (Rust project)
+- Add a stream decoder (one byte per time with internal buffer)
 
 ## License
 

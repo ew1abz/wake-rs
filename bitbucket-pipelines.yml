@@ -1,4 +1,4 @@
-image: rust:1.57
+image: rust:1.59
 
 pipelines:
   branches:
@@ -11,10 +11,6 @@ pipelines:
             - echo "Add rustfmt"                      ; rustup component add rustfmt
             - echo "Check code format"                ; cargo fmt --all -- --check
             - echo "Build project"                    ; cargo build --release
+            - echo "Build examples"                   ; cargo build --examples
             - echo "Run unit tests"                   ; cargo test --lib --release -v --no-fail-fast -- --nocapture --test
             - echo "Run documentation tests"          ; cargo test --doc --release -v --no-fail-fast -- --nocapture --test
-            #- echo "Run integration tests"            ; cargo test --test ${CARGO_LIB_NAME} --release -v --no-fail-fast -- --nocapture --test
-            #- echo "Run benchmark tests"              ; cargo test --lib --release -v --no-fail-fast -- --nocapture --bench
-            #- echo "Publish documentation"            ; ./scripts/docs.sh
-            #- echo "Upload to crates.io"              ; ./scripts/crates-io.sh
-            # TODO: - echo "Deploy to AWS"            ; ./scripts/aws.sh

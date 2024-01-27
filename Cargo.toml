@@ -1,15 +1,15 @@
 [package]
-name = "wakers"
-version = "0.2.2"
+name = "wake-rs"
+version = "0.2.3"
 authors = ["Vladimir K <ew1abz@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-categories = ["encoding"]
+categories = ["embedded", "encoding"]
 edition = "2021"
-description = "Wake protocol library in Rust language"
-repository = "https://bitbucket.org/ew1abz/wake-rs"
-keywords = ["wake", "serialization", "uC", "uCU", "serial", "protocol"]
-#documentation = "https://docs.rs/wakers"
+description = "Wake protocol library written in Rust"
+repository = "https://github.com/ew1abz/wake-rs"
+keywords = ["wake", "serialization", "serial", "protocol", "embedded"]
+documentation = "https://docs.rs/wake-rs"
 
 [dev-dependencies.serialport]
 version = "4.0.1"
@@ -17,6 +17,3 @@ default-features = false
 
 [dev-dependencies]
 rand = "0.8.4"
-
-[badges]
-maintenance = { status = "passively-maintained" }
