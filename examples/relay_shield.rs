@@ -1,11 +1,10 @@
-//! This example shows how to communicate with device that contan 4 relays.
+//! This example shows how to communicate with device that contans 4 relays.
 extern crate serialport;
-extern crate wake_rs;
+extern crate wake;
 
 use serialport::prelude::*;
 use std::thread;
 use std::time::Duration;
-use wake_rs::*;
 
 const C_INFO: u8 = 0x02;
 const C_RELAYS_SET: u8 = 0x10;
@@ -19,9 +18,9 @@ struct WakeCmd {
 
 const DO_NOT_CHECK_RX_SIZE: u8 = 0xFF;
 
-fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<(Vec<u8>), &str> {
+fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<Option<Vec<u8>>, &str> {
     let wp = wake::Packet {
-        addr: None,
+        address: None,
         command: cmd.code,
         data: Some(vec![0x00, 0xeb]),
     };
@@ -31,15 +30,19 @@ fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<(Vec<u8>
     let mut rx = [0; 0xff];
     if let Ok(t) = p.read(&mut rx) {
         if let Ok(decoded) = wake::decode_packet(&rx[..t].to_vec()) {
-            let code = decoded.0;
-            let data = decoded.1;
-            if code != cmd.code {
-                return Err("CMD mismatch");
+            if decoded.command != cmd.code {
+                return Err("RX_CMD != TX_CMD");
             }
-            if cmd.need_rx != DO_NOT_CHECK_RX_SIZE && data.len() != cmd.need_rx as usize {
-                return Err("need_rx != real_rx");
-            }
-            return Ok(data);
+            if cmd.need_rx != DO_NOT_CHECK_RX_SIZE {
+                match decoded.data {
+                    Some(data) => if data.len() != cmd.need_rx as usize {
+                            return Err("need_rx != real_rx");
+                            } else {return Ok(Some(data));}
+                    None => if cmd.need_rx as usize != 0 {
+                        return Err("need_rx != real_rx");
+                    }
+                }
+            }            
         }
     }
     Err("Cannot read")
@@ -53,7 +56,7 @@ fn get_info(p: &mut SerialPort) -> Result<String, &str> {
     };
     match send_cmd(p, cmd_get_info) {
         Ok(rx) => {
-            let s = String::from_utf8(rx).expect("Found invalid UTF-8");
+            let s = String::from_utf8(rx.unwrap()).expect("Found invalid UTF-8");
             return Ok(s);
         }
         Err(e) => return Err(e),
@@ -82,40 +85,30 @@ fn main() {
         timeout: Duration::from_millis(10),
     };
 
-    // if let Ok(ports) = serialport::available_ports() {
-    //     match ports.len() {
-    //         0 => panic!("No ports found."),
-    //         1 => println!("Found 1 port:"),
-    //         n => println!("Found {} ports:", n),
-    //     };
-    //     for p in ports.iter() {
-    //         println!("{:?}", p);
-    //     }
-    {
-        let port = serialport::open_with_settings("&ports[0].port_name", &settings);
-        match port {
-            Ok(mut p) => {
-                match get_info(&mut *p) {
-                    Ok(s) => println!("Port is opened. Shield connected: {:?}", s),
-                    Err(e) => panic!("Error [get_info]: {:?}", e),
-                }
-
-                let mut relay = 0;
-                let mut mode = 0;
-                loop {
-                    match set_relay(&mut *p, relay, mode) {
-                        Ok(_) => print!("\nRelay {} Mode {}", relay, mode),
-                        Err(e) => panic!("Error [set_relay]: {:?}", e),
-                    }
-                    mode += 1;
-                    if mode == MODE_MAX {
-                        mode = 0;
-                        relay = (relay + 1) & 3;
-                    }
-                    thread::sleep(Duration::from_millis(3000));
-                }
+    let port = serialport::open_with_settings("&ports[0].port_name", &settings);
+    match port {
+        Ok(mut p) => {
+            println!("Port is opened");
+            match get_info(&mut *p) {
+                Ok(s) => println!("Shield is connected: {:?}", s),
+                Err(e) => panic!("Error [get_info]: {:?}", e),
             }
-            Err(_e) => panic!("Error: Port not available"),
+
+            let mut relay = 0;
+            let mut mode = 0;
+            loop {
+                match set_relay(&mut *p, relay, mode) {
+                    Ok(_) => print!("\nRelay {} Mode {}", relay, mode),
+                    Err(e) => panic!("Error [set_relay]: {:?}", e),
+                }
+                mode += 1;
+                if mode == MODE_MAX {
+                    mode = 0;
+                    relay = (relay + 1) & 3;
+                }
+                thread::sleep(Duration::from_millis(3000));
+            }
         }
+        Err(_e) => panic!("Error: Port is not available"),
     }
 }
