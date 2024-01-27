@@ -29,7 +29,11 @@ fn main() {
     // print_packet("Destuffed packet:", &destuffed.unwrap());
 
     //let encoded = wake::encode_packet(0x03, Some(&xs));
-    let wp = wake::Packet{addr: Some(0x12), command: 3, data: Some(vec!{0x00, 0xeb})};
+    let wp = wake::Packet {
+        addr: Some(0x12),
+        command: 3,
+        data: Some(vec![0x00, 0xeb]),
+    };
     let encoded = wake::encode_packet(wp);
 
     //print_packet("Encoded packet:\t", &encoded);

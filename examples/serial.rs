@@ -1,10 +1,10 @@
 extern crate serialport;
 extern crate wake_rs;
 
-use std::io::Write;
 use serialport::prelude::*;
-use std::time::Duration;
+use std::io::Write;
 use std::thread;
+use std::time::Duration;
 use wake_rs::*;
 
 fn print_packet(header: &str, v: &Vec<u8>) {
@@ -26,9 +26,21 @@ fn main() {
     };
 
     let port = serialport::open_with_settings("/dev/ttyS2", &settings);
-    let cmd_version = wake::encode_packet(wake::Packet{addr: None, command: 0x01, data: None});
-    let cmd_start   = wake::encode_packet(wake::Packet{addr: None, command: 0x02, data: Some(vec!{10,10})});
-    let cmd_stop    = wake::encode_packet(wake::Packet{addr: None, command: 0x02, data: Some(vec!{0,0})});
+    let cmd_version = wake::encode_packet(wake::Packet {
+        addr: None,
+        command: 0x01,
+        data: None,
+    });
+    let cmd_start = wake::encode_packet(wake::Packet {
+        addr: None,
+        command: 0x02,
+        data: Some(vec![10, 10]),
+    });
+    let cmd_stop = wake::encode_packet(wake::Packet {
+        addr: None,
+        command: 0x02,
+        data: Some(vec![0, 0]),
+    });
 
     match port {
         Ok(mut p) => {
@@ -43,10 +55,14 @@ fn main() {
                 match state {
                     1 => cmd = cmd_start.clone(),
                     2 => cmd = cmd_stop.clone(),
-                    _ => {state = 0; cmd = cmd_version.clone()},
+                    _ => {
+                        state = 0;
+                        cmd = cmd_version.clone()
+                    }
                 }
                 state += 1;
-                p.write(cmd.as_mut_slice()).expect("failed to write message");
+                p.write(cmd.as_mut_slice())
+                    .expect("failed to write message");
                 if let Ok(t) = p.read(rx.as_mut_slice()) {
                     print_packet("RAW RX", &rx[..t].to_vec());
                     if let Ok(d) = wake::decode_packet(&rx[..t].to_vec()) {
