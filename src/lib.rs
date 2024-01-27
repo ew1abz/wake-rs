@@ -5,8 +5,7 @@
 extern crate rand;
 
 #[cfg(test)]
-use rand::{thread_rng, Rng};
-//use rand::Rng;
+use rand::Rng;
 use std::fmt;
 
 const FEND: u8 = 0xC0;
@@ -35,44 +34,29 @@ impl fmt::Display for Packet {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let addr = match self.address {
             Some(a) => format!("ADDR: 0x{:02X}", a),
-            None => "ADDR: 0x--".to_string(),
+            None => "ADDR: ----".to_string(),
         };
 
         let cmd = format!("CMD:  0x{:02X}", self.command);
 
         let data = match &self.data {
             Some(d) => {
-                let mut data = format!("DATA:");
-                for x in d {
-                    data.push_str(&format!(" {:02X}", x));
+                let mut print = format!("DATA: {} bytes\n", d.len());
+                print.push_str(&format!(
+                    "     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f"
+                ));
+                for (i, item) in d.iter().enumerate() {
+                    if (i == 0) | (i % 16 == 0) {
+                        print.push_str(&format!("\n{:02x}: ", i));
+                    }
+                    print.push_str(&format!("{:02x} ", item));
                 }
-                data
+                print
             }
             None => format!("DATA: none"),
         };
         write!(f, "{}\n{}\n{}\n", addr, cmd, data)
     }
-
-    //     write!(
-    //         f,
-    //         "ADDR: {} CMD: {} {}",
-    //         match self.address {
-    //             Some(a) => a.to_string(),
-    //             None => "--".to_string(),
-    //         },
-    //         self.command,
-    //         match &self.data {
-    //             Some(d) => {
-    //                 let a = "DATA: ";
-    //                 for x in d {
-    //                     format!("{} {:02X}", a, x);
-    //                 }
-    //                 a
-    //             }
-    //             None => "",
-    //         }
-    //     )
-    // }
 }
 
 /// Calculate CRC sum of data in a vector
@@ -448,21 +432,13 @@ fn decode_w_address_test() {
 fn random_encode_decode_test() {
     let mut rng = rand::thread_rng();
 
-    for _ in 0..10 {
+    for _ in 0..100_000 {
         let address_exists = rng.gen_bool(0.5);
         let n = rng.gen_range(0, 0x100);
         let mut d: Vec<u8> = Vec::new();
         for _ in 0..n {
             d.push(rng.gen_range(0, 0xff));
         }
-        //print!(" V {:?} {}\n", &d, n);
-
-        // let mut a = "DATA: ";
-        // for x in d.clone() {
-        //     a = format!("{} {:02X}", a, x);
-        //     //print!("{} {:02X}", a, x);
-        // }
-        // print!("W = {}", a);
 
         let wp = Packet {
             address: if address_exists {
@@ -471,9 +447,9 @@ fn random_encode_decode_test() {
                 None
             },
             command: rng.gen_range(0, 0x7f),
-            data: Some(d.clone()),
+            data: if d.len() == 0 { None } else { Some(d.clone()) },
         };
-        print!("{}\n", &wp);
+        // print!("{}\n", &wp);
         let encoded = wp.encode();
         let decoded = encoded.decode().unwrap();
         assert_eq!(decoded.address, wp.address);

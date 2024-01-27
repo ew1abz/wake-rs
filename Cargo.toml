@@ -8,5 +8,5 @@ version = "3.3.0"
 default-features = false
 
 [dev-dependencies]
-clap = "2.33.0"
+clap = "2.33.1"
 rand = "0.7.3"
