@@ -46,7 +46,7 @@ fn main() {
                     tx[1] &= 7;
                     if tx[1] == 0 {
                         tx[0] += 1; // relay number
-                        tx[0] &= 3; 
+                        tx[0] &= 3;
                      }
                     print!("\nRelay {} Mode {}", tx[0],  tx[1]);
                     let mut encoded = encode_packet(0x10, &tx);

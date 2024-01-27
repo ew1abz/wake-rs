@@ -11,9 +11,9 @@ const C_RELAYS_SET: u8  = 0x10;
 const MODE_MAX: u8 = 5;
 
 struct WakeCmd {
-    code: u8, 
+    code: u8,
     need_rx: u8,
-    tx: Vec<u8>, 
+    tx: Vec<u8>,
 }
 
 const DO_NOT_CHECK_RX_SIZE: u8  = 0xFF;
@@ -30,7 +30,7 @@ fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<(Vec<u8>
                 return Err("CMD mismatch")
             }
             if cmd.need_rx != DO_NOT_CHECK_RX_SIZE && data.len() != cmd.need_rx as usize {
-                    return Err("need_rx != real_rx") 
+                    return Err("need_rx != real_rx")
             }
             return Ok(data)
         }
@@ -52,7 +52,7 @@ fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<(Vec<u8>
                 let s = String::from_utf8(rx).expect("Found invalid UTF-8");
                 return Ok(s);},
             Err(e) => return Err(e),
-        } 
+        }
     }
 
     fn set_relay(p: &mut SerialPort, relay: u8, mode: u8) -> Result<(), &str> {
@@ -60,7 +60,7 @@ fn send_cmd<'a>(p: &mut serialport::SerialPort, cmd: WakeCmd) -> Result<(Vec<u8>
         match send_cmd(p, cmd_set_relay) {
             Ok(_) => return Ok(()),
             Err(e) => return Err(e),
-        }     
+        }
     }
 // }
 
@@ -97,7 +97,7 @@ fn main() {
                     match set_relay(&mut *p, relay, mode) {
                         Ok(_) =>  print!("\nRelay {} Mode {}", relay,  mode),
                         Err(e) => {print!("Error: {:?}", e); panic!("Error while communication");},
-                    }     
+                    }
                     mode += 1;
                     if mode == MODE_MAX {
                         mode = 0;
