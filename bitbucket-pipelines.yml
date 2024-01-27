@@ -2,7 +2,7 @@ image: rust:1.57
 
 pipelines:
   branches:
-    master:
+    '{master,develop}':
       - step:
           script:
             - echo "Update docker image"              ; apt update ; apt upgrade -y ; apt install libudev-dev -y
