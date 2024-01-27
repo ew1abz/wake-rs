@@ -53,7 +53,7 @@ impl fmt::Display for Packet {
         write!(f, "{}\n{}\n{}\n", addr, cmd, data)
     }
 
-            //     write!(
+    //     write!(
     //         f,
     //         "ADDR: {} CMD: {} {}",
     //         match self.address {
@@ -465,7 +465,11 @@ fn random_encode_decode_test() {
         // print!("W = {}", a);
 
         let wp = Packet {
-            address: if address_exists {Some(rng.gen_range(0, 0x7f))} else {None},
+            address: if address_exists {
+                Some(rng.gen_range(0, 0x7f))
+            } else {
+                None
+            },
             command: rng.gen_range(0, 0x7f),
             data: Some(d.clone()),
         };
