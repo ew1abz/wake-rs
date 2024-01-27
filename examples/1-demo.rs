@@ -1,9 +1,12 @@
-extern crate wake;
+//! This example shows how to encode/decode data.
+//! 1. Run this example `cargo run --example 1-demo`
 
-use wake::{Decode, Encode};
+extern crate wakers;
+
+use wakers::{Decode, Encode};
 
 fn print_hex_buffer(header: &str, v: &Vec<u8>) {
-    print!("\n{}\t", header);
+    print!("\n{}", header);
     for x in v {
         print!("{:02X} ", x);
     }
@@ -12,7 +15,7 @@ fn print_hex_buffer(header: &str, v: &Vec<u8>) {
 
 /// Simple wake_rs API demo
 fn main() {
-    let wp = wake::Packet {
+    let wp = wakers::Packet {
         address: Some(0x12),
         command: 3,
         data: Some(vec![0x00, 0xeb]),
@@ -22,5 +25,5 @@ fn main() {
     print_hex_buffer("Encoded packet:\t", &encoded);
 
     let decoded = encoded.decode();
-    println!("Decoded packet: {}", decoded.unwrap());
+    println!("Decoded packet:\n{}", decoded.unwrap());
 }

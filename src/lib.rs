@@ -1,4 +1,4 @@
-#![crate_name = "wake"]
+#![crate_name = "wakers"]
 //! Wake protocol library
 
 #[cfg(test)]
@@ -12,16 +12,38 @@ const FEND: u8 = 0xC0;
 const FESC: u8 = 0xDB;
 const TFEND: u8 = 0xDC;
 const TFESC: u8 = 0xDD;
+
 const ADDR_MASK: u8 = 0x80;
 const CRC_INIT: u8 = 0xDE;
 const PACKET_MIN_LEN: usize = 4;
 pub const DATA_MAX_LEN: usize = 0xff;
 
-const TOO_SHORT_PACKET: &'static str = "Too short packet";
-const CANNOT_FIND_START: &'static str = "Cannot find start of a packet";
-const DESTUFFING_FAILED: &'static str = "De-stuffing failed";
-const WRONG_LEN: &'static str = "Wrong packet length";
-const WRONG_CRC: &'static str = "Wrong CRC";
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum WakeError {
+    TooShortPacket,
+    CannotFindStart,
+    DestuffingFailed,
+    WrongPacketLength,
+    WrongPacketCrc,
+}
+
+impl std::error::Error for WakeError {
+    fn description(&self) -> &str {
+        match *self {
+            WakeError::TooShortPacket => "Too short packet",
+            WakeError::CannotFindStart => "Can't find a start of the packet",
+            WakeError::DestuffingFailed => "De-stuffing failed",
+            WakeError::WrongPacketLength => "Wrong packet length",
+            WakeError::WrongPacketCrc => "Wrong packet CRC",
+        }
+    }
+}
+
+impl fmt::Display for WakeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Wake error: {:?}", self)
+    }
+}
 
 #[derive(Default)]
 pub struct Packet {
@@ -59,26 +81,8 @@ impl fmt::Display for Packet {
     }
 }
 
-/// Calculate CRC sum of data in a vector
-///
-/// # Arguments
-///
-/// * `data: &Vec<u8>` - input data
-///
-/// # Output
-///
-/// * `u8` - Calculated CRC
-///
-// fn crc(data: &Vec<u8>) -> u8 {
-//     let mut crc: u8 = CRC_INIT;
-//     for n in data {
-//         crc8(&mut crc, *n);
-//     }
-//     crc
-// }
-
 pub trait Decode {
-    fn decode(&self) -> Result<Packet, &str>;
+    fn decode(&self) -> Result<Packet, WakeError>;
 }
 
 pub trait Encode {
@@ -89,7 +93,7 @@ trait Wake {
     // TODO: change the name?
     fn crc(&self) -> u8;
     fn stuff(&self) -> Vec<u8>;
-    fn dry(&self) -> Result<Vec<u8>, &str>;
+    fn dry(&self) -> Result<Vec<u8>, WakeError>;
 }
 
 impl Wake for Vec<u8> {
@@ -135,7 +139,9 @@ impl Wake for Vec<u8> {
     /// * `Vec<u8>` - output data
     ///
     fn stuff(&self) -> Vec<u8> {
-        let mut stuffed = vec![self[0]];
+        assert_eq!(self.len() >= (PACKET_MIN_LEN - 1), true); // without CRC
+        assert_eq!(self[0], FEND);
+        let mut stuffed: Vec<u8> = vec![self[0]];
         for x in &self[1..] {
             match *x {
                 FESC => {
@@ -161,22 +167,21 @@ impl Wake for Vec<u8> {
     ///
     /// # Output
     ///
-    /// * `Result<Vec<u8>>` - Destuffed data wrapped in Result
+    /// * `Result<Vec<u8>, WakeError>` - Destuffed data wrapped in Result
     ///
-    //fn dry(&self) -> Result<Vec<u8>> {
-    fn dry(&self) -> Result<Vec<u8>, &str> {
+    fn dry(&self) -> Result<Vec<u8>, WakeError> {
         let mut output: Vec<u8> = vec![];
         let mut i = 0;
         while i < self.len() {
             match self[i] {
                 FESC => {
                     if i > (self.len() - 2) {
-                        return Err(WRONG_LEN);
+                        return Err(WakeError::WrongPacketLength);
                     }
                     output.push(match self[i + 1] {
                         TFESC => FESC,
                         TFEND => FEND,
-                        _ => return Err(DESTUFFING_FAILED),
+                        _ => return Err(WakeError::DestuffingFailed),
                     });
                     i += 1;
                 }
@@ -197,13 +202,13 @@ impl Decode for Vec<u8> {
     ///
     /// # Output
     ///
-    /// * `Result<(u8, Vec<u8>), &str>` - command, data or error string
+    /// * `Result<(u8, Vec<u8>), WakeError>` - command, data or error
     ///
     /// # Example
     ///
     /// ```
-    /// extern crate wake;
-    /// use wake::Decode;
+    /// extern crate wakers;
+    /// use wakers::Decode;
     ///
     /// let encoded_packet = vec![0xC0, 0x03, 0x05, 1, 2, 3, 4, 5, 0x6b];
     /// let decoded_packet = encoded_packet.decode();
@@ -215,14 +220,14 @@ impl Decode for Vec<u8> {
     /// }
     /// ```
     ///
-    fn decode(&self) -> Result<Packet, &str> {
+    fn decode(&self) -> Result<Packet, WakeError> {
         // 1: Check packet length
         if self.len() < PACKET_MIN_LEN {
-            return Err(TOO_SHORT_PACKET);
+            return Err(WakeError::TooShortPacket);
         }
         // 2: Check START symbol (FEND)
-        if self[0] != FEND {
-            return Err(CANNOT_FIND_START);
+        if self[0] != FEND as u8 {
+            return Err(WakeError::CannotFindStart);
         }
         // 3: Dry packet (remove stuffed bytes)
         let mut destuffed_pkt = self.dry()?;
@@ -230,11 +235,11 @@ impl Decode for Vec<u8> {
         v_iter.next(); // skip start symbol
                        // 4: Get an address (if exists) and a command
         let mut decoded = Packet::default();
-        let (_, d) = v_iter.next().unwrap();
+        let (_, d) = v_iter.next().ok_or_else(|| WakeError::TooShortPacket)?;
         match d {
             addr @ ADDR_MASK..=0xff => {
                 decoded.address = Some(addr & !ADDR_MASK);
-                let (_, cmd) = v_iter.next().unwrap();
+                let (_, cmd) = v_iter.next().ok_or_else(|| WakeError::TooShortPacket)?;
                 decoded.command = *cmd;
             }
             cmd @ _ => {
@@ -243,10 +248,10 @@ impl Decode for Vec<u8> {
             }
         };
         // 5: Get data length
-        let (i, data_len) = v_iter.next().unwrap();
+        let (i, data_len) = v_iter.next().ok_or_else(|| WakeError::TooShortPacket)?;
         // 8: Check data length
         if (destuffed_pkt.len() - i - 2) != *data_len as usize {
-            return Err(WRONG_LEN);
+            return Err(WakeError::WrongPacketLength);
         }
         // 9: Get data
         decoded.data = match data_len {
@@ -256,17 +261,11 @@ impl Decode for Vec<u8> {
         // 6: Get CRC and remove it
         let received_crc = destuffed_pkt.remove(destuffed_pkt.len() - 1);
         // 10: Check CRC
-        // print!(
-        //     "received_crc = {:02X} destuffed_pkt.to_vec().crc() = {:02X} pkt = {:?}",
-        //     received_crc,
-        //     destuffed_pkt.to_vec().crc(),
-        //     destuffed_pkt.to_vec()
-        // );
-        return if received_crc != destuffed_pkt.to_vec().crc() {
-            Err(WRONG_CRC)
+        if received_crc != destuffed_pkt.to_vec().crc() {
+            Err(WakeError::WrongPacketCrc)
         } else {
             Ok(decoded)
-        };
+        }
     }
 }
 
@@ -284,20 +283,20 @@ impl Encode for Packet {
     /// # Example
     ///
     /// ```
-    /// extern crate wake;
-    /// use wake::Encode;
+    /// extern crate wakers;
+    /// use wakers::Encode;
     ///
-    /// let p = wake::Packet{address: Some(0x12), command: 3, data: Some(vec!{0x00, 0xeb})};
+    /// let p = wakers::Packet{address: Some(0x12), command: 3, data: Some(vec!{0x00, 0xeb})};
     /// let mut encoded_packet: Vec<u8> = p.encode();
     /// ```
     ///
     fn encode(&self) -> Vec<u8> {
-        let mut encoded_packet = vec![];
+        let mut encoded_packet: Vec<u8> = vec![];
         // 1. FEND
         encoded_packet.push(FEND);
         // 2. Address, if exists
         if let Some(addr) = self.address {
-            encoded_packet.push(addr as u8 | ADDR_MASK);
+            encoded_packet.push(addr | ADDR_MASK);
         }
         // 3. Command
         encoded_packet.push(self.command);
@@ -330,9 +329,24 @@ fn crc_test() {
 
 #[test]
 fn stuff_test() {
+    // Regular packet
     let a = vec![FEND, FESC, 1, 2, 3, 4, 5, FEND]; // initial_data
     let b = vec![FEND, FESC, TFESC, 1, 2, 3, 4, 5, FESC, TFEND]; // stuffed_data
     assert_eq!(a.stuff(), b);
+
+    // packet with min len
+    let a = vec![FEND, 3, 0];
+    assert_eq!(a.stuff(), a);
+
+    // empty packet, should panic
+    let a = vec![];
+    let result = std::panic::catch_unwind(|| a.stuff());
+    assert!(result.is_err());
+
+    // short packet, should panic
+    let a = vec![FEND, 3];
+    let result = std::panic::catch_unwind(|| a.stuff());
+    assert!(result.is_err());
 }
 
 #[test]
@@ -347,18 +361,40 @@ fn dry_test() {
     assert_eq!(t0.dry(), Ok(vec![]));
     assert_eq!(t1.clone().dry(), Ok(t1));
     assert_eq!(t2.clone().dry(), Ok(t2));
-    assert_eq!(t3.dry(), Err(WRONG_LEN));
-    assert_eq!(t4.dry(), Err(DESTUFFING_FAILED));
+    assert_eq!(t3.dry(), Err(WakeError::WrongPacketLength));
+    assert_eq!(t4.dry(), Err(WakeError::DestuffingFailed));
     assert_eq!(t5.dry(), Ok(a5));
 }
 #[test]
 fn encode_packet_test() {
+    // without address
+    let wp = Packet {
+        address: None,
+        command: 9,
+        data: Some(vec![0x12, 0x34]),
+    };
+    assert_eq!(wp.encode(), vec![FEND, 0x09, 0x02, 0x12, 0x34, 160]);
+    // with data
     let wp = Packet {
         address: Some(0x12),
         command: 3,
         data: Some(vec![0x00, 0xeb]),
     };
     assert_eq!(wp.encode(), vec![FEND, 0x92, 0x03, 0x02, 0x00, 0xeb, 114]);
+    // empty packet
+    let wp = Packet {
+        address: Some(0x13),
+        command: 4,
+        data: None,
+    };
+    assert_eq!(wp.encode(), vec![FEND, 0x93, 0x04, 0x00, 218]);
+    // empty packet with stuffing
+    let wp = Packet {
+        address: Some(0x14),
+        command: 0xc0,
+        data: None,
+    };
+    assert_eq!(wp.encode(), vec![FEND, 0x94, 219, 220, 0x00, 47]);
 }
 
 #[test]
@@ -378,35 +414,35 @@ fn decode_wo_address_test() {
 
     let bad_packet_too_short = vec![FEND, command, n];
     let decoded = bad_packet_too_short.decode();
-    assert_eq!(decoded.err(), Some(TOO_SHORT_PACKET));
+    assert_eq!(decoded.err(), Some(WakeError::TooShortPacket));
 
     let mut bad_packet_wo_start = vec![command, n];
     bad_packet_wo_start.extend_from_slice(&data);
     bad_packet_wo_start.extend_from_slice(&crc);
     let decoded = bad_packet_wo_start.decode();
-    assert_eq!(decoded.err(), Some(CANNOT_FIND_START));
+    assert_eq!(decoded.err(), Some(WakeError::CannotFindStart));
 
     let bad_packet_wrong_stuffing = vec![FEND, FESC, FESC, 1, 2, 3, 4, 5, FESC, TFEND]; // stuffed packed with wrong 3rd byte
     let decoded = bad_packet_wrong_stuffing.decode();
-    assert_eq!(decoded.err(), Some(DESTUFFING_FAILED));
+    assert_eq!(decoded.err(), Some(WakeError::DestuffingFailed));
 
     let mut bad_packet_wrong_data_len = vec![FEND, command, n - 1];
     bad_packet_wrong_data_len.extend_from_slice(&data);
     bad_packet_wrong_data_len.extend_from_slice(&wrong_crc);
     let decoded = bad_packet_wrong_data_len.decode();
-    assert_eq!(decoded.err(), Some(WRONG_LEN));
+    assert_eq!(decoded.err(), Some(WakeError::WrongPacketLength));
 
     let mut bad_packet_wrong_data_len = vec![FEND, command, n + 1];
     bad_packet_wrong_data_len.extend_from_slice(&data);
     bad_packet_wrong_data_len.extend_from_slice(&wrong_crc);
     let decoded = bad_packet_wrong_data_len.decode();
-    assert_eq!(decoded.err(), Some(WRONG_LEN));
+    assert_eq!(decoded.err(), Some(WakeError::WrongPacketLength));
 
     let mut bad_packet_wrong_crc = vec![FEND, command, n];
     bad_packet_wrong_crc.extend_from_slice(&data);
     bad_packet_wrong_crc.extend_from_slice(&wrong_crc);
     let decoded = bad_packet_wrong_crc.decode();
-    assert_eq!(decoded.err(), Some(WRONG_CRC));
+    assert_eq!(decoded.err(), Some(WakeError::WrongPacketCrc));
 }
 
 #[test]
@@ -434,19 +470,19 @@ fn random_encode_decode_test() {
 
     for _ in 0..100_000 {
         let address_exists = rng.gen_bool(0.5);
-        let n = rng.gen_range(0, 0x100);
+        let n = rng.gen_range(0..0x100);
         let mut d: Vec<u8> = Vec::new();
         for _ in 0..n {
-            d.push(rng.gen_range(0, 0xff));
+            d.push(rng.gen_range(0..0xff));
         }
 
         let wp = Packet {
             address: if address_exists {
-                Some(rng.gen_range(0, 0x7f))
+                Some(rng.gen_range(0..0x7f))
             } else {
                 None
             },
-            command: rng.gen_range(0, 0x7f),
+            command: rng.gen_range(0..0x7f),
             data: if d.len() == 0 { None } else { Some(d.clone()) },
         };
         // print!("{}\n", &wp);

@@ -1,12 +1,22 @@
 [package]
-name = "wake"
-version = "0.2.1"
+name = "wakers"
+version = "0.2.2"
 authors = ["Vladimir K <ew1abz@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+categories = ["encoding"]
+edition = "2021"
+description = "Wake protocol library in Rust language"
+repository = "https://bitbucket.org/ew1abz/wake-rs"
+keywords = ["wake", "serialization", "uC", "uCU", "serial", "protocol"]
+#documentation = "https://docs.rs/wakers"
 
 [dev-dependencies.serialport]
-version = "3.3.0"
+version = "4.0.1"
 default-features = false
 
 [dev-dependencies]
-clap = "2.33.1"
-rand = "0.7.3"
+rand = "0.8.4"
+
+[badges]
+maintenance = { status = "passively-maintained" }
